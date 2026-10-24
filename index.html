@@ -185,7 +185,7 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const A4_WIDTH = 1240; const A4_HEIGHT = 1754;
-        const MARGIN = 40; // Margin 40px di semua sisi
+        const MARGIN = 40; 
         
         canvas.width = A4_WIDTH; canvas.height = A4_HEIGHT;
 
@@ -194,20 +194,20 @@
         const photoAreaHeight = Math.floor(CONTENT_HEIGHT * 0.8);
         const textAreaHeight = CONTENT_HEIGHT - photoAreaHeight;
 
-        // Latar belakang utama (putih murni)
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, A4_WIDTH, A4_HEIGHT);
 
         let images = [];
         for (let file of files) {
             let img = await new Promise((resolve) => {
-                let reader = new FileReader();
-                reader.onload = (e) => {
-                    let image = new Image();
-                    image.onload = () => resolve(image);
-                    image.src = e.target.result;
+                let image = new Image();
+                // OPTIMALISASI: Menggunakan ObjectURL yang jauh lebih cepat daripada membaca seluruh file ke Base64
+                let objectUrl = URL.createObjectURL(file);
+                image.onload = () => {
+                    URL.revokeObjectURL(objectUrl); // Bersihkan memori segera setelah dimuat
+                    resolve(image);
                 };
-                reader.readAsDataURL(file);
+                image.src = objectUrl;
             });
             images.push(img);
         }
@@ -234,11 +234,9 @@
             ctx.drawImage(img, drawX, drawY, newW, newH);
         });
 
-        // Area teks dengan latar belakang abu-abu muda di dalam margin
         ctx.fillStyle = '#f8fafc';
         ctx.fillRect(MARGIN, MARGIN + photoAreaHeight, CONTENT_WIDTH, textAreaHeight);
         
-        // Format Tanggal
         const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
         const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
         let d = new Date(parseInt(dateData.year), parseInt(dateData.month) - 1, parseInt(dateData.day));
@@ -246,13 +244,11 @@
 
         let textY = MARGIN + photoAreaHeight + 60;
         
-        // Render Tanggal (Cetak Tebal)
         ctx.fillStyle = '#1e293b';
         ctx.font = 'bold 34px "Poppins", "Segoe UI", sans-serif';
         ctx.fillText(dateString, MARGIN + 40, textY);
         
-        // Render Teks Deskripsi
-        textY += 60; // Jarak antara tanggal dan deskripsi
+        textY += 60; 
         ctx.font = '32px "Poppins", "Segoe UI", sans-serif';
         
         let words = description.split(' ');
@@ -341,32 +337,29 @@
                 };
             }
 
-            // Fitur Unduh Otomatis File .txt
-            logStatus("Membuat salinan file deskripsi...", true);
-            let txtFilename = `deskripsi_${dateData.year}${dateData.month}${dateData.day}.txt`;
-            let txtContent = `Tanggal: ${dateData.day}-${dateData.month}-${dateData.year}\n\nDeskripsi Kegiatan:\n${desc}`;
-            let txtBlob = new Blob([txtContent], { type: 'text/plain' });
-            let downloadLink = document.createElement('a');
-            downloadLink.href = URL.createObjectURL(txtBlob);
-            downloadLink.download = txtFilename;
-            downloadLink.click();
-            URL.revokeObjectURL(downloadLink.href);
-
-            logStatus("Menyusun Laporan A4", true);
+            logStatus("Menyusun Laporan A4...", true);
             let reportBlob = await createReportImage(files, desc, dateData);
 
-            logStatus("Mengatur Folder Google Drive", true);
+            logStatus("Mengatur Folder Google Drive...", true);
             let idUtama = await getOrCreateFolder("laporan kerja pegawai");
             let idTahun = await getOrCreateFolder(dateData.year, idUtama);
             let idBulan = await getOrCreateFolder(dateData.month, idTahun);
             let idHari = await getOrCreateFolder(dateData.day, idBulan);
 
-            logStatus("Mengunggah Laporan ke Drive", true);
-            let filename = `Laporan_${dateData.year}${dateData.month}${dateData.day}_${new Date().getTime()}.jpg`;
-            await uploadToDrive(reportBlob, filename, idHari);
+            logStatus("Mengunggah File ke Drive...", true);
+            
+            // 1. Mengunggah Laporan A4
+            let imgFilename = `Laporan_${dateData.year}${dateData.month}${dateData.day}_${new Date().getTime()}.jpg`;
+            await uploadToDrive(reportBlob, imgFilename, idHari);
 
-            logStatus("✅ Laporan Berhasil Diunggah!", false);
-            alert('Sukses diunggah ke folder Drive Anda!');
+            // 2. Mengunggah File .txt Deskripsi langsung ke folder yang sama
+            let txtFilename = `Deskripsi_${dateData.year}${dateData.month}${dateData.day}_${new Date().getTime()}.txt`;
+            let txtContent = `Tanggal: ${dateData.day}-${dateData.month}-${dateData.year}\n\nDeskripsi Kegiatan:\n${desc}`;
+            let txtBlob = new Blob([txtContent], { type: 'text/plain' });
+            await uploadToDrive(txtBlob, txtFilename, idHari);
+
+            logStatus("✅ Laporan & Deskripsi Berhasil Diunggah!", false);
+            alert('Laporan dan file teks berhasil tersimpan ke folder Drive Anda!');
             
             document.getElementById('photos').value = '';
             document.getElementById('description').value = '';
