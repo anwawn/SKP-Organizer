@@ -4,45 +4,119 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laporan Kegiatan Organizer by @anwawn</title>
+    <!-- Menambahkan Font Google (Poppins) untuk kesan modern -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
     <style>
-        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background-color: #f4f7f6; padding: 20px; margin: 0; color: #333; }
-        .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        h1 { font-size: 1.2rem; text-align: center; color: #2c3e50; margin-bottom: 20px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; }
-        input[type="file"], input[type="date"], textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
-        textarea { resize: vertical; height: 100px; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.3s; }
-        .btn-auth { background-color: #4285F4; color: white; }
-        .btn-upload { background-color: #27ae60; color: white; display: none; }
-        .btn-upload:disabled { background-color: #95a5a6; cursor: not-allowed; }
-        #status { margin-top: 15px; font-size: 0.85rem; text-align: center; color: #e67e22; }
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --success: #10b981;
+            --success-hover: #059669;
+            --bg-gradient: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+        }
+
+        * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; }
+        
+        body { 
+            background: var(--bg-gradient); 
+            min-height: 100vh; 
+            padding: 20px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            color: var(--text-main); 
+        }
+        
+        .container { 
+            width: 100%; 
+            max-width: 550px; 
+            background: rgba(255, 255, 255, 0.95); 
+            padding: 35px 25px; 
+            border-radius: 20px; 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1); 
+            backdrop-filter: blur(10px);
+        }
+        
+        h1 { font-size: 1.4rem; text-align: center; color: var(--primary); margin-bottom: 25px; font-weight: 600; }
+        
+        .form-group { margin-bottom: 20px; }
+        
+        label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.95rem; color: var(--text-main); }
+        
+        input[type="date"], textarea { 
+            width: 100%; padding: 12px 15px; border: 1.5px solid #d1d5db; 
+            border-radius: 10px; font-size: 0.95rem; transition: all 0.3s ease; 
+            background: #f9fafb;
+        }
+        
+        input[type="date"]:focus, textarea:focus { 
+            border-color: var(--primary); outline: none; background: white;
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); 
+        }
+        
+        /* Styling khusus input file yang lebih modern */
+        input[type="file"] {
+            width: 100%; padding: 15px; background: #f8fafc;
+            border: 2px dashed #cbd5e1; border-radius: 12px; cursor: pointer; transition: 0.3s;
+        }
+        input[type="file"]:hover { border-color: var(--primary); }
+        input[type="file"]::file-selector-button {
+            background: var(--primary); color: white; border: none;
+            padding: 8px 16px; border-radius: 8px; cursor: pointer;
+            margin-right: 15px; font-weight: 500; font-family: 'Poppins', sans-serif; transition: 0.3s;
+        }
+        input[type="file"]::file-selector-button:hover { background: var(--primary-hover); }
+
+        textarea { resize: vertical; height: 110px; }
+        
+        button { 
+            width: 100%; padding: 14px; border: none; border-radius: 12px; 
+            font-size: 1.05rem; font-weight: 600; cursor: pointer; margin-top: 15px; 
+            transition: all 0.3s ease; display: flex; justify-content: center; align-items: center;
+        }
+        
+        .btn-auth { background-color: var(--primary); color: white; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); }
+        .btn-auth:hover { background-color: var(--primary-hover); transform: translateY(-2px); }
+        
+        .btn-upload { background-color: var(--success); color: white; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); display: none; }
+        .btn-upload:hover { background-color: var(--success-hover); transform: translateY(-2px); }
+        .btn-upload:disabled { background-color: #9ca3af; cursor: not-allowed; transform: none; box-shadow: none; }
+        
+        #status { margin-top: 20px; font-size: 0.9rem; text-align: center; color: var(--text-muted); font-weight: 500; }
+        
+        /* Animasi loading sederhana */
+        .loading:after { content: '...'; animation: dots 1.5s steps(5, end) infinite; }
+        @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Laporan Kegiatan Organizer by @anwawn</h1>
+    <h1>Laporan Kegiatan Organizer<br><span style="font-size: 0.85rem; font-weight: 400; color: #6b7280;">by @anwawn</span></h1>
     
-    <button id="btnAuth" class="btn-auth">1. Login Google Drive</button>
+    <button id="btnAuth" class="btn-auth">
+        <svg style="width: 20px; height: 20px; margin-right: 8px;" viewBox="0 0 24 24" fill="white"><path d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.36,19.27 5,16.25 5,12C5,7.9 8.2,4.73 12.2,4.73C15.29,4.73 17.1,6.7 17.1,6.7L19,4.72C19,4.72 16.56,2 12.1,2C6.42,2 2.03,6.8 2.03,12C2.03,17.05 6.16,22 12.25,22C17.6,22 21.5,18.33 21.5,12.91C21.5,11.76 21.35,11.1 21.35,11.1V11.1Z"/></svg>
+        Login dengan Akun Google
+    </button>
 
-    <div id="appInterface" style="display: none; margin-top: 20px;">
+    <div id="appInterface" style="display: none; margin-top: 10px;">
         <div class="form-group">
             <label>Unggah Foto (Bisa lebih dari 1)</label>
             <input type="file" id="photos" multiple accept="image/*">
         </div>
         <div class="form-group">
-            <label>Tanggal Alternatif (Jika foto tanpa data waktu)</label>
+            <label>Tanggal Alternatif (Pilih jika foto tanpa data Exif)</label>
             <input type="date" id="fallbackDate">
         </div>
         <div class="form-group">
             <label>Deskripsi Kegiatan</label>
-            <textarea id="description" placeholder="Tuliskan deskripsi kegiatan di sini..."></textarea>
+            <textarea id="description" placeholder="Tuliskan detail deskripsi kegiatan di sini..."></textarea>
         </div>
-        <button id="btnUpload" class="btn-upload">2. Susun & Unggah ke Drive</button>
+        <button id="btnUpload" class="btn-upload">Susun & Unggah Laporan</button>
     </div>
 
     <div id="status"></div>
@@ -53,19 +127,37 @@
     const CLIENT_ID = '899048761775-dbutua2rjtdcaitocooenf4kr677dcnk.apps.googleusercontent.com';
     const SCOPES = 'https://www.googleapis.com/auth/drive.file';
     let tokenClient;
-    let accessToken = null;
+    
+    // Mengecek apakah ada token yang tersimpan di localStorage
+    let accessToken = localStorage.getItem('gdrive_token');
+    let tokenExpiry = localStorage.getItem('gdrive_token_expiry');
 
     window.onload = function () {
+        // Cek apakah token masih valid (waktu saat ini < waktu kedaluwarsa)
+        if (accessToken && tokenExpiry && Date.now() < parseInt(tokenExpiry)) {
+            document.getElementById('btnAuth').style.display = 'none';
+            document.getElementById('appInterface').style.display = 'block';
+            document.getElementById('btnUpload').style.display = 'block';
+            logStatus("Sesi aktif. Anda siap membuat laporan.");
+        }
+
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
             scope: SCOPES,
             callback: (tokenResponse) => {
                 if (tokenResponse && tokenResponse.access_token) {
                     accessToken = tokenResponse.access_token;
+                    // Token dari Google berlaku selama 3600 detik (1 jam)
+                    let expiryTime = Date.now() + (tokenResponse.expires_in * 1000);
+                    
+                    // Simpan ke memory browser (localStorage)
+                    localStorage.setItem('gdrive_token', accessToken);
+                    localStorage.setItem('gdrive_token_expiry', expiryTime.toString());
+
                     document.getElementById('btnAuth').style.display = 'none';
                     document.getElementById('appInterface').style.display = 'block';
                     document.getElementById('btnUpload').style.display = 'block';
-                    logStatus("Login berhasil. Silakan siapkan laporan.");
+                    logStatus("Login berhasil. Sesi akan bertahan selama 1 jam.");
                 }
             }
         });
@@ -73,8 +165,14 @@
 
     document.getElementById('btnAuth').onclick = () => { tokenClient.requestAccessToken(); };
 
-    function logStatus(msg) {
-        document.getElementById('status').innerText = msg;
+    function logStatus(msg, isLoading = false) {
+        const statusEl = document.getElementById('status');
+        statusEl.innerText = msg;
+        if (isLoading) {
+            statusEl.classList.add('loading');
+        } else {
+            statusEl.classList.remove('loading');
+        }
     }
 
     function getPhotoDate(file) {
@@ -139,15 +237,16 @@
             ctx.drawImage(img, drawX, drawY, newW, newH);
         });
 
-        ctx.fillStyle = '#f8f9fa';
+        // Background deskripsi abu-abu muda
+        ctx.fillStyle = '#f8fafc';
         ctx.fillRect(0, photoAreaHeight, A4_WIDTH, textAreaHeight);
-        ctx.fillStyle = '#000';
-        ctx.font = '32px "Segoe UI"';
+        ctx.fillStyle = '#1e293b';
+        ctx.font = '32px "Poppins", "Segoe UI", sans-serif';
         
         let words = description.split(' ');
         let line = ''; let textY = photoAreaHeight + 60;
         const maxWidth = A4_WIDTH - 80;
-        const lineHeight = 45;
+        const lineHeight = 48;
 
         for(let n = 0; n < words.length; n++) {
             let testLine = line + words[n] + ' ';
@@ -169,6 +268,12 @@
     async function fetchDrive(url, options = {}) {
         options.headers = { ...options.headers, 'Authorization': `Bearer ${accessToken}` };
         let res = await fetch(url, options);
+        if (res.status === 401) {
+            // Jika Unauthorized, bersihkan memori dan minta login lagi
+            localStorage.removeItem('gdrive_token');
+            localStorage.removeItem('gdrive_token_expiry');
+            throw new Error("Sesi login telah berakhir. Silakan muat ulang halaman dan login kembali.");
+        }
         return res.json();
     }
 
@@ -206,17 +311,17 @@
         const fallbackDate = document.getElementById('fallbackDate').value;
         const btn = document.getElementById('btnUpload');
 
-        if (files.length === 0) return alert('Pilih minimal 1 foto!');
+        if (files.length === 0) return alert('Pilih minimal 1 foto laporan!');
 
         btn.disabled = true;
         btn.innerText = "Memproses & Mengunggah...";
         
         try {
-            logStatus("Membaca tanggal foto...");
+            logStatus("Membaca tanggal foto", true);
             let dateData = await getPhotoDate(files[0]);
             
             if (!dateData) {
-                if (!fallbackDate) throw new Error("Foto tidak memiliki data tanggal. Mohon isi Tanggal Alternatif.");
+                if (!fallbackDate) throw new Error("Foto tidak memiliki data waktu dari kamera. Mohon isi Tanggal Alternatif.");
                 let d = new Date(fallbackDate);
                 dateData = {
                     year: d.getFullYear().toString(),
@@ -225,27 +330,33 @@
                 };
             }
 
-            logStatus("Menyusun Laporan A4...");
+            logStatus("Menyusun Laporan A4", true);
             let reportBlob = await createReportImage(files, desc);
 
-            logStatus("Mengatur Folder Google Drive...");
+            logStatus("Mengatur Folder Google Drive", true);
             let idUtama = await getOrCreateFolder("laporan kerja pegawai");
             let idTahun = await getOrCreateFolder(dateData.year, idUtama);
             let idBulan = await getOrCreateFolder(dateData.month, idTahun);
             let idHari = await getOrCreateFolder(dateData.day, idBulan);
 
-            logStatus("Mengunggah File...");
+            logStatus("Mengunggah Laporan ke Drive", true);
             let filename = `Laporan_${dateData.year}${dateData.month}${dateData.day}_${new Date().getTime()}.jpg`;
             await uploadToDrive(reportBlob, filename, idHari);
 
-            logStatus("✅ Laporan Berhasil Diunggah!");
-            alert('Sukses diunggah ke Google Drive!');
+            logStatus("✅ Laporan Berhasil Diunggah!", false);
+            alert('Sukses diunggah ke folder Drive Anda!');
+            
+            // Mengosongkan form setelah sukses (opsional, hapus jika tidak perlu)
+            document.getElementById('photos').value = '';
+            document.getElementById('description').value = '';
+            
         } catch (err) {
             console.error(err);
-            logStatus("❌ Error: " + err.message);
+            logStatus("❌ Error: " + err.message, false);
+            if (err.message.includes("Sesi login")) alert(err.message);
         } finally {
             btn.disabled = false;
-            btn.innerText = "2. Susun & Unggah ke Drive";
+            btn.innerText = "Susun & Unggah Laporan";
         }
     };
 </script>
