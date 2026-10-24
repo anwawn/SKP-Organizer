@@ -46,12 +46,10 @@
     </div>
 
     <div id="status"></div>
-    <!-- Canvas tersembunyi untuk proses render A4 -->
     <canvas id="canvas" style="display: none;"></canvas>
 </div>
 
 <script>
-    // Konfigurasi Google API
     const CLIENT_ID = '899048761775-dbutua2rjtdcaitocooenf4kr677dcnk.apps.googleusercontent.com';
     const SCOPES = 'https://www.googleapis.com/auth/drive.file';
     let tokenClient;
@@ -79,7 +77,6 @@
         document.getElementById('status').innerText = msg;
     }
 
-    // Fungsi membaca EXIF Date
     function getPhotoDate(file) {
         return new Promise((resolve) => {
             EXIF.getData(file, function() {
@@ -94,22 +91,18 @@
         });
     }
 
-    // Fungsi Render Canvas A4 (1240 x 1754)
     async function createReportImage(files, description) {
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const A4_WIDTH = 1240; const A4_HEIGHT = 1754;
         canvas.width = A4_WIDTH; canvas.height = A4_HEIGHT;
 
-        // 80% area foto (1403px), 20% area teks (351px)
         const photoAreaHeight = Math.floor(A4_HEIGHT * 0.8);
         const textAreaHeight = A4_HEIGHT - photoAreaHeight;
 
-        // Latar belakang putih
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, A4_WIDTH, A4_HEIGHT);
 
-        // Load semua image
         let images = [];
         for (let file of files) {
             let img = await new Promise((resolve) => {
@@ -124,7 +117,6 @@
             images.push(img);
         }
 
-        // Kalkulasi Grid
         let cols = Math.ceil(Math.sqrt(images.length));
         let rows = Math.ceil(images.length / cols);
         let cellW = A4_WIDTH / cols;
@@ -132,12 +124,21 @@
 
         images.forEach((img, i) => {
             let col = i % cols; let row = Math.floor(i / cols);
-            let x = col * cellW; let y = row * cellH;
-            // Gambar dengan fit (menyisakan sedikit margin)
-            ctx.drawImage(img, x + 10, y + 10, cellW - 20, cellH - 20);
+            let cellX = col * cellW + 10;
+            let cellY = row * cellH + 10;
+            let targetW = cellW - 20;
+            let targetH = cellH - 20;
+
+            let ratio = Math.min(targetW / img.width, targetH / img.height);
+            let newW = img.width * ratio;
+            let newH = img.height * ratio;
+            
+            let drawX = cellX + (targetW - newW) / 2;
+            let drawY = cellY + (targetH - newH) / 2;
+
+            ctx.drawImage(img, drawX, drawY, newW, newH);
         });
 
-        // Area Teks Bawah (20%)
         ctx.fillStyle = '#f8f9fa';
         ctx.fillRect(0, photoAreaHeight, A4_WIDTH, textAreaHeight);
         ctx.fillStyle = '#000';
@@ -165,7 +166,6 @@
         });
     }
 
-    // Interaksi API Drive
     async function fetchDrive(url, options = {}) {
         options.headers = { ...options.headers, 'Authorization': `Bearer ${accessToken}` };
         let res = await fetch(url, options);
@@ -200,7 +200,6 @@
         return res.json();
     }
 
-    // Proses Utama
     document.getElementById('btnUpload').onclick = async () => {
         const files = document.getElementById('photos').files;
         const desc = document.getElementById('description').value;
