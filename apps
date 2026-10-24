@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laporan Kegiatan Organizer by @anwawn</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f4f7f6; padding: 20px; margin: 0; color: #333; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1 { font-size: 1.2rem; text-align: center; color: #2c3e50; margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; }
+        input[type="file"], input[type="date"], textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
+        textarea { resize: vertical; height: 100px; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.3s; }
+        .btn-auth { background-color: #4285F4; color: white; }
+        .btn-upload { background-color: #27ae60; color: white; display: none; }
+        .btn-upload:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        #status { margin-top: 15px; font-size: 0.85rem; text-align: center; color: #e67e22; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Laporan Kegiatan Organizer by @anwawn</h1>
+    
+    <button id="btnAuth" class="btn-auth">1. Login Google Drive</button>
+
+    <div id="appInterface" style="display: none; margin-top: 20px;">
+        <div class="form-group">
+            <label>Unggah Foto (Bisa lebih dari 1)</label>
+            <input type="file" id="photos" multiple accept="image/*">
+        </div>
+        <div class="form-group">
+            <label>Tanggal Alternatif (Jika foto tanpa data waktu)</label>
+            <input type="date" id="fallbackDate">
+        </div>
+        <div class="form-group">
+            <label>Deskripsi Kegiatan</label>
+            <textarea id="description" placeholder="Tuliskan deskripsi kegiatan di sini..."></textarea>
+        </div>
+        <button id="btnUpload" class="btn-upload">2. Susun & Unggah ke Drive</button>
+    </div>
+
+    <div id="status"></div>
+    <!-- Canvas tersembunyi untuk proses render A4 -->
+    <canvas id="canvas" style="display: none;"></canvas>
+</div>
+
+<script>
+    // Konfigurasi Google API (GANTILAH CLIENT_ID DI BAWAH INI DENGAN MILIK ANDA)
+    const CLIENT_ID = 'GANTI_DENGAN_CLIENT_ID_GOOGLE_ANDA.apps.googleusercontent.com';
+    const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+    let tokenClient;
+    let accessToken = null;
+
+    window.onload = function () {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: (tokenResponse) => {
+                if (tokenResponse && tokenResponse.access_token) {
+                    accessToken = tokenResponse.access_token;
+                    document.getElementById('btnAuth').style.display = 'none';
+                    document.getElementById('appInterface').style.display = 'block';
+                    document.getElementById('btnUpload').style.display = 'block';
+                    logStatus("Login berhasil. Silakan siapkan laporan.");
+                }
+            }
+        });
+    };
+
+    document.getElementById('btnAuth').onclick = () => { tokenClient.requestAccessToken(); };
+
+    function logStatus(msg) {
+        document.getElementById('status').innerText = msg;
+    }
+
+    // Fungsi membaca EXIF Date
+    function getPhotoDate(file) {
+        return new Promise((resolve) => {
+            EXIF.getData(file, function() {
+                let dateStr = EXIF.getTag(this, "DateTimeOriginal");
+                if (dateStr) {
+                    let parts = dateStr.split(" ")[0].split(":");
+                    resolve({ year: parts[0], month: parts[1], day: parts[2] });
+                } else {
+                    resolve(null);
+                }
+            });
+        });
+    }
+
+    // Fungsi Render Canvas A4 (1240 x 1754)
+    async function createReportImage(files, description) {
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const A4_WIDTH = 1240; const A4_HEIGHT = 1754;
+        canvas.width = A4_WIDTH; canvas.height = A4_HEIGHT;
+
+        // 80% area foto (1403px), 20% area teks (351px)
+        const photoAreaHeight = Math.floor(A4_HEIGHT * 0.8);
+        const textAreaHeight = A4_HEIGHT - photoAreaHeight;
+
+        // Latar belakang putih
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, A4_WIDTH, A4_HEIGHT);
+
+        // Load semua image
+        let images = [];
+        for (let file of files) {
+            let img = await new Promise((resolve) => {
+                let reader = new FileReader();
+                reader.onload = (e) => {
+                    let image = new Image();
+                    image.onload = () => resolve(image);
+                    image.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+            images.push(img);
+        }
+
+        // Kalkulasi Grid
+        let cols = Math.ceil(Math.sqrt(images.length));
+        let rows = Math.ceil(images.length / cols);
+        let cellW = A4_WIDTH / cols;
+        let cellH = photoAreaHeight / rows;
+
+        images.forEach((img, i) => {
+            let col = i % cols; let row = Math.floor(i / cols);
+            let x = col * cellW; let y = row * cellH;
+            // Gambar dengan fit (menyisakan sedikit margin)
+            ctx.drawImage(img, x + 10, y + 10, cellW - 20, cellH - 20);
+        });
+
+        // Area Teks Bawah (20%)
+        ctx.fillStyle = '#f8f9fa';
+        ctx.fillRect(0, photoAreaHeight, A4_WIDTH, textAreaHeight);
+        ctx.fillStyle = '#000';
+        ctx.font = '32px "Segoe UI"';
+        
+        let words = description.split(' ');
+        let line = ''; let textY = photoAreaHeight + 60;
+        const maxWidth = A4_WIDTH - 80;
+        const lineHeight = 45;
+
+        for(let n = 0; n < words.length; n++) {
+            let testLine = line + words[n] + ' ';
+            let metrics = ctx.measureText(testLine);
+            if (metrics.width > maxWidth && n > 0) {
+                ctx.fillText(line, 40, textY);
+                line = words[n] + ' '; textY += lineHeight;
+            } else {
+                line = testLine;
+            }
+        }
+        ctx.fillText(line, 40, textY);
+
+        return new Promise(resolve => {
+            canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.85);
+        });
+    }
+
+    // Interaksi API Drive
+    async function fetchDrive(url, options = {}) {
+        options.headers = { ...options.headers, 'Authorization': `Bearer ${accessToken}` };
+        let res = await fetch(url, options);
+        return res.json();
+    }
+
+    async function getOrCreateFolder(folderName, parentId = 'root') {
+        let q = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
+        let res = await fetchDrive(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`);
+        
+        if (res.files && res.files.length > 0) return res.files[0].id;
+
+        let createRes = await fetchDrive('https://www.googleapis.com/drive/v3/files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] })
+        });
+        return createRes.id;
+    }
+
+    async function uploadToDrive(blob, filename, folderId) {
+        let metadata = { name: filename, parents: [folderId] };
+        let formData = new FormData();
+        formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        formData.append('file', blob);
+
+        let res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}` },
+            body: formData
+        });
+        return res.json();
+    }
+
+    // Proses Utama
+    document.getElementById('btnUpload').onclick = async () => {
+        const files = document.getElementById('photos').files;
+        const desc = document.getElementById('description').value;
+        const fallbackDate = document.getElementById('fallbackDate').value;
+        const btn = document.getElementById('btnUpload');
+
+        if (files.length === 0) return alert('Pilih minimal 1 foto!');
+
+        btn.disabled = true;
+        btn.innerText = "Memproses & Mengunggah...";
+        
+        try {
+            logStatus("Membaca tanggal foto...");
+            let dateData = await getPhotoDate(files[0]);
+            
+            if (!dateData) {
+                if (!fallbackDate) throw new Error("Foto tidak memiliki data tanggal. Mohon isi Tanggal Alternatif.");
+                let d = new Date(fallbackDate);
+                dateData = {
+                    year: d.getFullYear().toString(),
+                    month: ('0' + (d.getMonth() + 1)).slice(-2),
+                    day: ('0' + d.getDate()).slice(-2)
+                };
+            }
+
+            logStatus("Menyusun Laporan A4...");
+            let reportBlob = await createReportImage(files, desc);
+
+            logStatus("Mengatur Folder Google Drive...");
+            let idUtama = await getOrCreateFolder("laporan kerja pegawai");
+            let idTahun = await getOrCreateFolder(dateData.year, idUtama);
+            let idBulan = await getOrCreateFolder(dateData.month, idTahun);
+            let idHari = await getOrCreateFolder(dateData.day, idBulan);
+
+            logStatus("Mengunggah File...");
+            let filename = `Laporan_${dateData.year}${dateData.month}${dateData.day}_${new Date().getTime()}.jpg`;
+            await uploadToDrive(reportBlob, filename, idHari);
+
+            logStatus("✅ Laporan Berhasil Diunggah!");
+            alert('Sukses diunggah ke Google Drive!');
+        } catch (err) {
+            console.error(err);
+            logStatus("❌ Error: " + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "2. Susun & Unggah ke Drive";
+        }
+    };
+</script>
+</body>
+</html>
