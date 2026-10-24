@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laporan Kegiatan Organizer by @anwawn</title>
-    <!-- Menambahkan Font Google (Poppins) untuk kesan modern -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
@@ -58,7 +57,6 @@
             box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); 
         }
         
-        /* Styling khusus input file yang lebih modern */
         input[type="file"] {
             width: 100%; padding: 15px; background: #f8fafc;
             border: 2px dashed #cbd5e1; border-radius: 12px; cursor: pointer; transition: 0.3s;
@@ -87,8 +85,6 @@
         .btn-upload:disabled { background-color: #9ca3af; cursor: not-allowed; transform: none; box-shadow: none; }
         
         #status { margin-top: 20px; font-size: 0.9rem; text-align: center; color: var(--text-muted); font-weight: 500; }
-        
-        /* Animasi loading sederhana */
         .loading:after { content: '...'; animation: dots 1.5s steps(5, end) infinite; }
         @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
     </style>
@@ -128,12 +124,10 @@
     const SCOPES = 'https://www.googleapis.com/auth/drive.file';
     let tokenClient;
     
-    // Mengecek apakah ada token yang tersimpan di localStorage
     let accessToken = localStorage.getItem('gdrive_token');
     let tokenExpiry = localStorage.getItem('gdrive_token_expiry');
 
     window.onload = function () {
-        // Cek apakah token masih valid (waktu saat ini < waktu kedaluwarsa)
         if (accessToken && tokenExpiry && Date.now() < parseInt(tokenExpiry)) {
             document.getElementById('btnAuth').style.display = 'none';
             document.getElementById('appInterface').style.display = 'block';
@@ -147,10 +141,8 @@
             callback: (tokenResponse) => {
                 if (tokenResponse && tokenResponse.access_token) {
                     accessToken = tokenResponse.access_token;
-                    // Token dari Google berlaku selama 3600 detik (1 jam)
                     let expiryTime = Date.now() + (tokenResponse.expires_in * 1000);
                     
-                    // Simpan ke memory browser (localStorage)
                     localStorage.setItem('gdrive_token', accessToken);
                     localStorage.setItem('gdrive_token_expiry', expiryTime.toString());
 
@@ -189,15 +181,20 @@
         });
     }
 
-    async function createReportImage(files, description) {
+    async function createReportImage(files, description, dateData) {
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const A4_WIDTH = 1240; const A4_HEIGHT = 1754;
+        const MARGIN = 40; // Margin 40px di semua sisi
+        
         canvas.width = A4_WIDTH; canvas.height = A4_HEIGHT;
 
-        const photoAreaHeight = Math.floor(A4_HEIGHT * 0.8);
-        const textAreaHeight = A4_HEIGHT - photoAreaHeight;
+        const CONTENT_WIDTH = A4_WIDTH - (MARGIN * 2);
+        const CONTENT_HEIGHT = A4_HEIGHT - (MARGIN * 2);
+        const photoAreaHeight = Math.floor(CONTENT_HEIGHT * 0.8);
+        const textAreaHeight = CONTENT_HEIGHT - photoAreaHeight;
 
+        // Latar belakang utama (putih murni)
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, A4_WIDTH, A4_HEIGHT);
 
@@ -217,13 +214,13 @@
 
         let cols = Math.ceil(Math.sqrt(images.length));
         let rows = Math.ceil(images.length / cols);
-        let cellW = A4_WIDTH / cols;
+        let cellW = CONTENT_WIDTH / cols;
         let cellH = photoAreaHeight / rows;
 
         images.forEach((img, i) => {
             let col = i % cols; let row = Math.floor(i / cols);
-            let cellX = col * cellW + 10;
-            let cellY = row * cellH + 10;
+            let cellX = MARGIN + (col * cellW) + 10;
+            let cellY = MARGIN + (row * cellH) + 10;
             let targetW = cellW - 20;
             let targetH = cellH - 20;
 
@@ -237,28 +234,43 @@
             ctx.drawImage(img, drawX, drawY, newW, newH);
         });
 
-        // Background deskripsi abu-abu muda
+        // Area teks dengan latar belakang abu-abu muda di dalam margin
         ctx.fillStyle = '#f8fafc';
-        ctx.fillRect(0, photoAreaHeight, A4_WIDTH, textAreaHeight);
+        ctx.fillRect(MARGIN, MARGIN + photoAreaHeight, CONTENT_WIDTH, textAreaHeight);
+        
+        // Format Tanggal
+        const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        let d = new Date(parseInt(dateData.year), parseInt(dateData.month) - 1, parseInt(dateData.day));
+        let dateString = `${days[d.getDay()]}, ${dateData.day} ${months[d.getMonth()]} ${dateData.year}`;
+
+        let textY = MARGIN + photoAreaHeight + 60;
+        
+        // Render Tanggal (Cetak Tebal)
         ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 34px "Poppins", "Segoe UI", sans-serif';
+        ctx.fillText(dateString, MARGIN + 40, textY);
+        
+        // Render Teks Deskripsi
+        textY += 60; // Jarak antara tanggal dan deskripsi
         ctx.font = '32px "Poppins", "Segoe UI", sans-serif';
         
         let words = description.split(' ');
-        let line = ''; let textY = photoAreaHeight + 60;
-        const maxWidth = A4_WIDTH - 80;
+        let line = ''; 
+        const maxWidth = CONTENT_WIDTH - 80;
         const lineHeight = 48;
 
         for(let n = 0; n < words.length; n++) {
             let testLine = line + words[n] + ' ';
             let metrics = ctx.measureText(testLine);
             if (metrics.width > maxWidth && n > 0) {
-                ctx.fillText(line, 40, textY);
+                ctx.fillText(line, MARGIN + 40, textY);
                 line = words[n] + ' '; textY += lineHeight;
             } else {
                 line = testLine;
             }
         }
-        ctx.fillText(line, 40, textY);
+        ctx.fillText(line, MARGIN + 40, textY);
 
         return new Promise(resolve => {
             canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.85);
@@ -269,7 +281,6 @@
         options.headers = { ...options.headers, 'Authorization': `Bearer ${accessToken}` };
         let res = await fetch(url, options);
         if (res.status === 401) {
-            // Jika Unauthorized, bersihkan memori dan minta login lagi
             localStorage.removeItem('gdrive_token');
             localStorage.removeItem('gdrive_token_expiry');
             throw new Error("Sesi login telah berakhir. Silakan muat ulang halaman dan login kembali.");
@@ -330,8 +341,19 @@
                 };
             }
 
+            // Fitur Unduh Otomatis File .txt
+            logStatus("Membuat salinan file deskripsi...", true);
+            let txtFilename = `deskripsi_${dateData.year}${dateData.month}${dateData.day}.txt`;
+            let txtContent = `Tanggal: ${dateData.day}-${dateData.month}-${dateData.year}\n\nDeskripsi Kegiatan:\n${desc}`;
+            let txtBlob = new Blob([txtContent], { type: 'text/plain' });
+            let downloadLink = document.createElement('a');
+            downloadLink.href = URL.createObjectURL(txtBlob);
+            downloadLink.download = txtFilename;
+            downloadLink.click();
+            URL.revokeObjectURL(downloadLink.href);
+
             logStatus("Menyusun Laporan A4", true);
-            let reportBlob = await createReportImage(files, desc);
+            let reportBlob = await createReportImage(files, desc, dateData);
 
             logStatus("Mengatur Folder Google Drive", true);
             let idUtama = await getOrCreateFolder("laporan kerja pegawai");
@@ -346,7 +368,6 @@
             logStatus("✅ Laporan Berhasil Diunggah!", false);
             alert('Sukses diunggah ke folder Drive Anda!');
             
-            // Mengosongkan form setelah sukses (opsional, hapus jika tidak perlu)
             document.getElementById('photos').value = '';
             document.getElementById('description').value = '';
             
