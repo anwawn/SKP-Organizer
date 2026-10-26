@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laporan Kegiatan Organizer by @anwawn</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
     <style>
@@ -43,16 +43,18 @@
         h1 { font-size: 1.4rem; text-align: center; color: var(--primary); margin-bottom: 25px; font-weight: 600; }
         
         .form-group { margin-bottom: 20px; }
+        .flex-group { display: flex; gap: 15px; }
+        .flex-group > div { flex: 1; }
         
         label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.95rem; color: var(--text-main); }
         
-        input[type="date"], textarea { 
+        input[type="date"], input[type="time"], textarea { 
             width: 100%; padding: 12px 15px; border: 1.5px solid #d1d5db; 
             border-radius: 10px; font-size: 0.95rem; transition: all 0.3s ease; 
             background: #f9fafb;
         }
         
-        input[type="date"]:focus, textarea:focus { 
+        input[type="date"]:focus, input[type="time"]:focus, textarea:focus { 
             border-color: var(--primary); outline: none; background: white;
             box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); 
         }
@@ -65,7 +67,7 @@
         input[type="file"]::file-selector-button {
             background: var(--primary); color: white; border: none;
             padding: 8px 16px; border-radius: 8px; cursor: pointer;
-            margin-right: 15px; font-weight: 500; font-family: 'Poppins', sans-serif; transition: 0.3s;
+            margin-right: 15px; font-weight: 500; transition: 0.3s;
         }
         input[type="file"]::file-selector-button:hover { background: var(--primary-hover); }
 
@@ -96,7 +98,7 @@
     
     <button id="btnAuth" class="btn-auth">
         <svg style="width: 20px; height: 20px; margin-right: 8px;" viewBox="0 0 24 24" fill="white"><path d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.36,19.27 5,16.25 5,12C5,7.9 8.2,4.73 12.2,4.73C15.29,4.73 17.1,6.7 17.1,6.7L19,4.72C19,4.72 16.56,2 12.1,2C6.42,2 2.03,6.8 2.03,12C2.03,17.05 6.16,22 12.25,22C17.6,22 21.5,18.33 21.5,12.91C21.5,11.76 21.35,11.1 21.35,11.1V11.1Z"/></svg>
-        Login dengan Akun Google
+        Login Google Drive
     </button>
 
     <div id="appInterface" style="display: none; margin-top: 10px;">
@@ -104,15 +106,21 @@
             <label>Unggah Foto (Bisa lebih dari 1)</label>
             <input type="file" id="photos" multiple accept="image/*">
         </div>
-        <div class="form-group">
-            <label>Tanggal Alternatif (Pilih jika foto tanpa data Exif)</label>
-            <input type="date" id="fallbackDate">
+        <div class="form-group flex-group">
+            <div>
+                <label>Tanggal Alternatif</label>
+                <input type="date" id="fallbackDate">
+            </div>
+            <div>
+                <label>Waktu Alternatif</label>
+                <input type="time" id="fallbackTime">
+            </div>
         </div>
         <div class="form-group">
             <label>Deskripsi Kegiatan</label>
             <textarea id="description" placeholder="Tuliskan detail deskripsi kegiatan di sini..."></textarea>
         </div>
-        <button id="btnUpload" class="btn-upload">Susun & Unggah Laporan</button>
+        <button id="btnUpload" class="btn-upload">Susun Laporan A3 & Unggah</button>
     </div>
 
     <div id="status"></div>
@@ -142,7 +150,6 @@
                 if (tokenResponse && tokenResponse.access_token) {
                     accessToken = tokenResponse.access_token;
                     let expiryTime = Date.now() + (tokenResponse.expires_in * 1000);
-                    
                     localStorage.setItem('gdrive_token', accessToken);
                     localStorage.setItem('gdrive_token_expiry', expiryTime.toString());
 
@@ -167,44 +174,53 @@
         }
     }
 
-    function getPhotoDate(file) {
+    function getPhotoExifData(file) {
         return new Promise((resolve) => {
             EXIF.getData(file, function() {
                 let dateStr = EXIF.getTag(this, "DateTimeOriginal");
                 if (dateStr) {
-                    let parts = dateStr.split(" ")[0].split(":");
-                    resolve({ year: parts[0], month: parts[1], day: parts[2] });
-                } else {
-                    resolve(null);
+                    let parts = dateStr.split(" ");
+                    if (parts.length === 2) {
+                        let dParts = parts[0].split(":");
+                        let tParts = parts[1].split(":");
+                        resolve({ 
+                            year: dParts[0], month: dParts[1], day: dParts[2],
+                            hour: tParts[0], minute: tParts[1],
+                            totalMins: parseInt(tParts[0]) * 60 + parseInt(tParts[1])
+                        });
+                        return;
+                    }
                 }
+                resolve(null);
             });
         });
     }
 
-    async function createReportImage(files, description, dateData) {
+    async function createReportImage(files, description, dateData, timeString) {
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const A4_WIDTH = 1240; const A4_HEIGHT = 1754;
-        const MARGIN = 40; 
         
-        canvas.width = A4_WIDTH; canvas.height = A4_HEIGHT;
+        const A3_WIDTH = 1754; 
+        const A3_HEIGHT = 2480;
+        const MARGIN = 60; 
+        
+        canvas.width = A3_WIDTH; canvas.height = A3_HEIGHT;
 
-        const CONTENT_WIDTH = A4_WIDTH - (MARGIN * 2);
-        const CONTENT_HEIGHT = A4_HEIGHT - (MARGIN * 2);
-        const photoAreaHeight = Math.floor(CONTENT_HEIGHT * 0.8);
+        const CONTENT_WIDTH = A3_WIDTH - (MARGIN * 2);
+        const CONTENT_HEIGHT = A3_HEIGHT - (MARGIN * 2);
+        const photoAreaHeight = Math.floor(CONTENT_HEIGHT * 0.75);
         const textAreaHeight = CONTENT_HEIGHT - photoAreaHeight;
 
         ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, A4_WIDTH, A4_HEIGHT);
+        ctx.fillRect(0, 0, A3_WIDTH, A3_HEIGHT);
 
         let images = [];
         for (let file of files) {
             let img = await new Promise((resolve) => {
                 let image = new Image();
-                // OPTIMALISASI: Menggunakan ObjectURL yang jauh lebih cepat daripada membaca seluruh file ke Base64
                 let objectUrl = URL.createObjectURL(file);
                 image.onload = () => {
-                    URL.revokeObjectURL(objectUrl); // Bersihkan memori segera setelah dimuat
+                    URL.revokeObjectURL(objectUrl);
                     resolve(image);
                 };
                 image.src = objectUrl;
@@ -219,10 +235,10 @@
 
         images.forEach((img, i) => {
             let col = i % cols; let row = Math.floor(i / cols);
-            let cellX = MARGIN + (col * cellW) + 10;
-            let cellY = MARGIN + (row * cellH) + 10;
-            let targetW = cellW - 20;
-            let targetH = cellH - 20;
+            let cellX = MARGIN + (col * cellW) + 15;
+            let cellY = MARGIN + (row * cellH) + 15;
+            let targetW = cellW - 30;
+            let targetH = cellH - 30;
 
             let ratio = Math.min(targetW / img.width, targetH / img.height);
             let newW = img.width * ratio;
@@ -242,31 +258,38 @@
         let d = new Date(parseInt(dateData.year), parseInt(dateData.month) - 1, parseInt(dateData.day));
         let dateString = `${days[d.getDay()]}, ${dateData.day} ${months[d.getMonth()]} ${dateData.year}`;
 
-        let textY = MARGIN + photoAreaHeight + 60;
-        
-        ctx.fillStyle = '#1e293b';
-        ctx.font = 'bold 34px "Poppins", "Segoe UI", sans-serif';
-        ctx.fillText(dateString, MARGIN + 40, textY);
+        let textY = MARGIN + photoAreaHeight + 80;
+        let paddingX = MARGIN + 50;
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 48px "Poppins", "Segoe UI", sans-serif';
+        ctx.fillText(dateString, paddingX, textY);
         
         textY += 60; 
-        ctx.font = '32px "Poppins", "Segoe UI", sans-serif';
+        ctx.fillStyle = '#334155';
+        ctx.font = '600 36px "Poppins", "Segoe UI", sans-serif';
+        ctx.fillText(timeString, paddingX, textY);
+
+        textY += 75; 
+        ctx.fillStyle = '#1e293b';
+        ctx.font = '38px "Poppins", "Segoe UI", sans-serif';
         
         let words = description.split(' ');
         let line = ''; 
-        const maxWidth = CONTENT_WIDTH - 80;
-        const lineHeight = 48;
+        const maxWidth = CONTENT_WIDTH - 100;
+        const lineHeight = 56;
 
         for(let n = 0; n < words.length; n++) {
             let testLine = line + words[n] + ' ';
             let metrics = ctx.measureText(testLine);
             if (metrics.width > maxWidth && n > 0) {
-                ctx.fillText(line, MARGIN + 40, textY);
+                ctx.fillText(line, paddingX, textY);
                 line = words[n] + ' '; textY += lineHeight;
             } else {
                 line = testLine;
             }
         }
-        ctx.fillText(line, MARGIN + 40, textY);
+        ctx.fillText(line, paddingX, textY);
 
         return new Promise(resolve => {
             canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.85);
@@ -279,9 +302,11 @@
         if (res.status === 401) {
             localStorage.removeItem('gdrive_token');
             localStorage.removeItem('gdrive_token_expiry');
-            throw new Error("Sesi login telah berakhir. Silakan muat ulang halaman dan login kembali.");
+            alert("Sesi login Google Anda telah kedaluwarsa. Aplikasi akan dimuat ulang secara otomatis.");
+            window.location.reload();
+            throw new Error("Sesi login telah berakhir.");
         }
-        return res.json();
+        return await res.json();
     }
 
     async function getOrCreateFolder(folderName, parentId = 'root') {
@@ -298,6 +323,41 @@
         return createRes.id;
     }
 
+    async function updateOrCreateTxt(folderId, dateData, timeString, desc) {
+        let txtFilename = `Deskripsi_${dateData.year}${dateData.month}${dateData.day}.txt`;
+        let q = `name='${txtFilename}' and mimeType='text/plain' and '${folderId}' in parents and trashed=false`;
+        let searchRes = await fetchDrive(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`);
+        
+        let newEntry = `=================================\nWaktu: ${timeString}\nDeskripsi:\n${desc}\n`;
+
+        if (searchRes.files && searchRes.files.length > 0) {
+            let fileId = searchRes.files[0].id;
+            let contentRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            let oldContent = await contentRes.text();
+            let finalContent = oldContent + '\n' + newEntry;
+
+            await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'text/plain' },
+                body: finalContent
+            });
+        } else {
+            let initialContent = `REKAPITULASI DESKRIPSI KEGIATAN\nTanggal: ${dateData.day}-${dateData.month}-${dateData.year}\n\n` + newEntry;
+            let metadata = { name: txtFilename, parents: [folderId], mimeType: 'text/plain' };
+            let formData = new FormData();
+            formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            formData.append('file', new Blob([initialContent], { type: 'text/plain' }));
+
+            await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${accessToken}` },
+                body: formData
+            });
+        }
+    }
+
     async function uploadToDrive(blob, filename, folderId) {
         let metadata = { name: filename, parents: [folderId] };
         let formData = new FormData();
@@ -309,13 +369,24 @@
             headers: { 'Authorization': `Bearer ${accessToken}` },
             body: formData
         });
-        return res.json();
+        return await res.json();
     }
 
     document.getElementById('btnUpload').onclick = async () => {
+        // Pengecekan Proaktif: Hapus sesi dan reload jika waktu lewat 1 jam
+        let currentExpiry = localStorage.getItem('gdrive_token_expiry');
+        if (!accessToken || !currentExpiry || Date.now() >= parseInt(currentExpiry)) {
+            alert("Sesi login Anda telah berakhir. Aplikasi akan dimuat ulang secara otomatis.");
+            localStorage.removeItem('gdrive_token');
+            localStorage.removeItem('gdrive_token_expiry');
+            window.location.reload();
+            return;
+        }
+
         const files = document.getElementById('photos').files;
         const desc = document.getElementById('description').value;
         const fallbackDate = document.getElementById('fallbackDate').value;
+        const fallbackTime = document.getElementById('fallbackTime').value;
         const btn = document.getElementById('btnUpload');
 
         if (files.length === 0) return alert('Pilih minimal 1 foto laporan!');
@@ -324,42 +395,69 @@
         btn.innerText = "Memproses & Mengunggah...";
         
         try {
-            logStatus("Membaca tanggal foto", true);
-            let dateData = await getPhotoDate(files[0]);
+            logStatus("Memindai data waktu pada foto...", true);
             
-            if (!dateData) {
-                if (!fallbackDate) throw new Error("Foto tidak memiliki data waktu dari kamera. Mohon isi Tanggal Alternatif.");
+            let firstExif = await getPhotoExifData(files[0]);
+            let targetDate;
+            if (firstExif) {
+                targetDate = { year: firstExif.year, month: firstExif.month, day: firstExif.day };
+            } else if (fallbackDate) {
                 let d = new Date(fallbackDate);
-                dateData = {
+                targetDate = {
                     year: d.getFullYear().toString(),
                     month: ('0' + (d.getMonth() + 1)).slice(-2),
                     day: ('0' + d.getDate()).slice(-2)
                 };
+            } else {
+                throw new Error("Foto pertama tidak memiliki data waktu. Mohon isi Tanggal Alternatif.");
             }
 
-            logStatus("Menyusun Laporan A4...", true);
-            let reportBlob = await createReportImage(files, desc, dateData);
+            let allExifs = [];
+            for(let file of files) {
+                let e = await getPhotoExifData(file);
+                if(e) allExifs.push(e);
+            }
+            let validTimes = allExifs.filter(e => e.year === targetDate.year && e.month === targetDate.month && e.day === targetDate.day);
+
+            let timeString = "";
+            if (validTimes.length > 0) {
+                validTimes.sort((a, b) => a.totalMins - b.totalMins);
+                let first = validTimes[0];
+                let last = validTimes[validTimes.length - 1];
+                let diff = last.totalMins - first.totalMins;
+
+                if (diff < 60) {
+                    timeString = `${first.hour}.${first.minute} WITA - selesai`;
+                } else {
+                    timeString = `${first.hour}.${first.minute} - ${last.hour}.${last.minute} WITA`;
+                }
+            } else {
+                if (fallbackTime) {
+                    let tParts = fallbackTime.split(':');
+                    timeString = `${tParts[0]}.${tParts[1]} WITA - selesai`;
+                } else {
+                    timeString = "(Waktu manual / tidak tercatat)";
+                }
+            }
+
+            logStatus("Menyusun Laporan A3...", true);
+            let reportBlob = await createReportImage(files, desc, targetDate, timeString);
 
             logStatus("Mengatur Folder Google Drive...", true);
             let idUtama = await getOrCreateFolder("laporan kerja pegawai");
-            let idTahun = await getOrCreateFolder(dateData.year, idUtama);
-            let idBulan = await getOrCreateFolder(dateData.month, idTahun);
-            let idHari = await getOrCreateFolder(dateData.day, idBulan);
+            let idTahun = await getOrCreateFolder(targetDate.year, idUtama);
+            let idBulan = await getOrCreateFolder(targetDate.month, idTahun);
+            let idHari = await getOrCreateFolder(targetDate.day, idBulan);
 
-            logStatus("Mengunggah File ke Drive...", true);
+            logStatus("Mengunggah File Laporan & Rekap Teks...", true);
             
-            // 1. Mengunggah Laporan A4
-            let imgFilename = `Laporan_${dateData.year}${dateData.month}${dateData.day}_${new Date().getTime()}.jpg`;
+            let imgFilename = `Laporan_${targetDate.year}${targetDate.month}${targetDate.day}_${new Date().getTime()}.jpg`;
             await uploadToDrive(reportBlob, imgFilename, idHari);
 
-            // 2. Mengunggah File .txt Deskripsi langsung ke folder yang sama
-            let txtFilename = `Deskripsi_${dateData.year}${dateData.month}${dateData.day}_${new Date().getTime()}.txt`;
-            let txtContent = `Tanggal: ${dateData.day}-${dateData.month}-${dateData.year}\n\nDeskripsi Kegiatan:\n${desc}`;
-            let txtBlob = new Blob([txtContent], { type: 'text/plain' });
-            await uploadToDrive(txtBlob, txtFilename, idHari);
+            await updateOrCreateTxt(idHari, targetDate, timeString, desc);
 
-            logStatus("✅ Laporan & Deskripsi Berhasil Diunggah!", false);
-            alert('Laporan dan file teks berhasil tersimpan ke folder Drive Anda!');
+            logStatus("✅ Laporan Berhasil Diunggah!", false);
+            alert('Laporan A3 dan rekapan teks sukses disimpan di Drive!');
             
             document.getElementById('photos').value = '';
             document.getElementById('description').value = '';
@@ -370,7 +468,7 @@
             if (err.message.includes("Sesi login")) alert(err.message);
         } finally {
             btn.disabled = false;
-            btn.innerText = "Susun & Unggah Laporan";
+            btn.innerText = "Susun Laporan A3 & Unggah";
         }
     };
 </script>
