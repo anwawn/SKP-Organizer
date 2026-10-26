@@ -211,8 +211,16 @@
         const photoAreaHeight = Math.floor(CONTENT_HEIGHT * 0.75);
         const textAreaHeight = CONTENT_HEIGHT - photoAreaHeight;
 
+        // Background Putih A3
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, A3_WIDTH, A3_HEIGHT);
+
+        // Header Teks Abu-abu (Pojok Kanan Atas)
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = 'italic 24px "Poppins", "Segoe UI", sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText("Daily Activity Report Organizer, develop by : @anwawn | 2K26", A3_WIDTH - MARGIN, 45);
+        ctx.textAlign = 'left'; // Reset alignment ke kiri untuk elemen di bawahnya
 
         let images = [];
         for (let file of files) {
@@ -246,8 +254,25 @@
             
             let drawX = cellX + (targetW - newW) / 2;
             let drawY = cellY + (targetH - newH) / 2;
+            let borderRadius = 25; 
 
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+            ctx.shadowBlur = 20;
+            ctx.shadowOffsetX = 5;
+            ctx.shadowOffsetY = 10;
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.roundRect(drawX, drawY, newW, newH, borderRadius);
+            ctx.fill();
+            ctx.restore();
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(drawX, drawY, newW, newH, borderRadius);
+            ctx.clip();
             ctx.drawImage(img, drawX, drawY, newW, newH);
+            ctx.restore();
         });
 
         ctx.fillStyle = '#f8fafc';
@@ -373,7 +398,6 @@
     }
 
     document.getElementById('btnUpload').onclick = async () => {
-        // Pengecekan Proaktif: Hapus sesi dan reload jika waktu lewat 1 jam
         let currentExpiry = localStorage.getItem('gdrive_token_expiry');
         if (!accessToken || !currentExpiry || Date.now() >= parseInt(currentExpiry)) {
             alert("Sesi login Anda telah berakhir. Aplikasi akan dimuat ulang secara otomatis.");
