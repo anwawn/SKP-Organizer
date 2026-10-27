@@ -204,7 +204,7 @@
         });
     }
 
-    // ALGORITMA JUSTIFIED LAYOUT BERBASIS RASIO (Rata Kiri-Kanan Sempurna, Tanpa Crop)
+    // ALGORITMA BINARY SEARCH JUSTIFIED GRID (GARANSI RATA KIRI-KANAN)
     async function createReportImage(files, description, dateData, timeString) {
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -217,13 +217,12 @@
 
         const CONTENT_WIDTH = A3_WIDTH - (MARGIN * 2);
         const CONTENT_HEIGHT = A3_HEIGHT - (MARGIN * 2);
-        const photoAreaHeight = Math.floor(CONTENT_HEIGHT * 0.75);
+        const photoAreaHeight = Math.floor(CONTENT_HEIGHT * 0.75); // Area max foto 75%
         const textAreaHeight = CONTENT_HEIGHT - photoAreaHeight;
 
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, A3_WIDTH, A3_HEIGHT);
 
-        // Header
         ctx.fillStyle = '#94a3b8';
         ctx.font = 'italic 24px "Poppins", "Segoe UI", sans-serif';
         ctx.textAlign = 'right';
@@ -244,92 +243,90 @@
             images.push(img);
         }
 
-        let totalImages = images.length;
         let paddingGap = 16;
         let borderRadius = 20;
-        let availableWidth = CONTENT_WIDTH;
-
-        // Tentukan tinggi target referensi berdasarkan jumlah foto yang diunggah
-        let targetRowHeight = 350; 
-        if (totalImages > 20) targetRowHeight = 180;
-        else if (totalImages > 12) targetRowHeight = 220;
-        else if (totalImages > 6) targetRowHeight = 280;
-        else if (totalImages <= 3) targetRowHeight = 450;
-
-        // Ekstrak rasio tiap foto
-        let processedImages = images.map(img => ({ img: img, ratio: img.width / img.height }));
         
-        let rows = [];
-        let currentRow = [];
-        let currentRowRatio = 0;
+        // PENCARIAN BINER UNTUK MENCARI TINGGI BARIS YANG SEMPURNA
+        let low = 50;   // Tinggi minimal baris yang diizinkan
+        let high = 1500; // Tinggi maksimal baris
+        let finalRows = [];
+        let finalTotalHeight = 0;
 
-        // Kumpulkan foto dalam satu baris sampai akumulasi lebarnya menyentuh/melebihi lebar A3
-        for (let i = 0; i < processedImages.length; i++) {
-            currentRow.push(processedImages[i]);
-            currentRowRatio += processedImages[i].ratio;
+        // Lakukan 50 iterasi untuk presisi tinggi tingkat sub-piksel
+        for (let iter = 0; iter < 50; iter++) {
+            let mid = (low + high) / 2; // Target tinggi rata-rata baris saat ini
+            let tempRows = [];
+            let currentRow = [];
+            let currentRatio = 0;
 
-            let projectedWidth = (targetRowHeight * currentRowRatio) + (paddingGap * (currentRow.length - 1));
+            for (let i = 0; i < images.length; i++) {
+                let ratio = images[i].width / images[i].height;
+                currentRow.push({ img: images[i], ratio: ratio });
+                currentRatio += ratio;
 
-            // Jika baris sudah penuh atau ini adalah foto terakhir
-            if (projectedWidth >= availableWidth || i === processedImages.length - 1) {
-                rows.push({ items: currentRow, ratio: currentRowRatio });
-                currentRow = [];
-                currentRowRatio = 0;
+                // Hitung tinggi yang dibutuhkan agar baris ini memenuhi 100% lebar A3
+                let h_justified = (CONTENT_WIDTH - paddingGap * (currentRow.length - 1)) / currentRatio;
+
+                // Kunci baris jika tingginya sudah menyentuh target 'mid' atau ini foto terakhir
+                if (h_justified <= mid || i === images.length - 1) {
+                    tempRows.push({ items: currentRow, ratio: currentRatio, h: h_justified });
+                    currentRow = [];
+                    currentRatio = 0;
+                }
+            }
+
+            // Aturan Khusus Baris Terakhir (Jika jumlah foto ganjil/sedikit)
+            if (tempRows.length > 1) {
+                let prevH = tempRows[tempRows.length - 2].h;
+                // Jika baris terakhir melar menjadi sangat raksasa, potong tingginya menyesuaikan baris sebelumnya
+                if (tempRows[tempRows.length - 1].h > prevH * 1.3) {
+                    tempRows[tempRows.length - 1].h = prevH;
+                    tempRows[tempRows.length - 1].isCentered = true; // Ratakan tengah saja
+                }
+            } else if (tempRows.length === 1 && tempRows[0].h > photoAreaHeight * 0.7) {
+                tempRows[0].h = photoAreaHeight * 0.7;
+                tempRows[0].isCentered = true;
+            }
+
+            // Hitung total tinggi semua susunan baris ini
+            let totalH = tempRows.reduce((sum, r) => sum + r.h, 0) + paddingGap * (tempRows.length - 1);
+
+            // Jika total tinggi muat di area kertas, simpan sebagai kandidat terbaik, lalu coba perbesar lagi (low = mid)
+            if (totalH <= photoAreaHeight) {
+                finalRows = tempRows;
+                finalTotalHeight = totalH;
+                low = mid; 
+            } else {
+                // Jika total tinggi melebih kertas, kita butuh baris yang lebih pendek (foto lebih banyak per baris)
+                high = mid;
             }
         }
 
-        let rowHeights = [];
-        let totalCalculatedHeight = 0;
+        // Jika karena suatu hal kalkulasi awal tidak memberikan hasil, paksakan baris dari iterasi terakhir
+        if (finalRows.length === 0) finalRows = [{ items: images.map(img => ({img, ratio: img.width/img.height})), h: photoAreaHeight/3, ratio: images.reduce((sum, img)=>sum+img.width/img.height,0), isCentered: true }];
 
-        // Hitung tinggi absolut tiap baris agar foto menempel persis di margin kiri dan kanan
-        for (let r = 0; r < rows.length; r++) {
-            let row = rows[r];
-            let exactHeight = (availableWidth - (paddingGap * (row.items.length - 1))) / row.ratio;
-            
-            // Cegah baris terakhir menjadi sangat raksasa jika jumlah fotonya sedikit (sisa)
-            if (r === rows.length - 1 && rows.length > 1) {
-                let prevHeight = rowHeights[r-1];
-                if (exactHeight > prevHeight * 1.5) exactHeight = prevHeight;
-            } else if (r === 0 && rows.length === 1 && exactHeight > photoAreaHeight * 0.8) {
-                 exactHeight = photoAreaHeight * 0.6; 
-            }
-            
-            rowHeights.push(exactHeight);
-            totalCalculatedHeight += exactHeight + paddingGap;
-        }
-        totalCalculatedHeight -= paddingGap;
-
-        // Jika jumlah baris terlalu banyak dan menabrak area teks, perkecil skala seluruhnya secara proporsional
-        let globalScale = 1;
-        if (totalCalculatedHeight > photoAreaHeight) {
-            globalScale = photoAreaHeight / totalCalculatedHeight;
-        }
-
-        // Posisikan blok foto secara sentral (vertikal) di dalam area foto jika ada sisa ruang
+        // Posisikan susunan persis di tengah vertikal area foto
         let currentY = MARGIN;
-        if (totalCalculatedHeight * globalScale < photoAreaHeight) {
-             currentY = MARGIN + (photoAreaHeight - (totalCalculatedHeight * globalScale)) / 2;
+        if (finalTotalHeight < photoAreaHeight) {
+            currentY = MARGIN + (photoAreaHeight - finalTotalHeight) / 2;
         }
 
-        // Gambar setiap baris dan foto
-        for (let r = 0; r < rows.length; r++) {
-            let row = rows[r];
-            let h = rowHeights[r] * globalScale;
-            
-            // Hitung ulang lebar riil baris ini
-            let rowW = row.items.reduce((sum, item) => sum + (h * item.ratio), 0) + (paddingGap * (row.items.length - 1));
+        // PROSES MENGGAMBAR FOTO (Rata Penuh Kiri-Kanan)
+        for (let r = 0; r < finalRows.length; r++) {
+            let row = finalRows[r];
+            let h = row.h;
             let currentX = MARGIN;
             
-            // Khusus untuk baris terakhir yang mungkin tingginya dipangkas (tidak full width), posisikan di tengah
-            if (rowW < availableWidth - 2) {
-                 currentX = MARGIN + (availableWidth - rowW) / 2;
+            // Baris terakhir biasanya rata tengah karena fotonya sedikit
+            if (row.isCentered) {
+                let rowW = row.items.reduce((sum, item) => sum + (h * item.ratio), 0) + paddingGap * (row.items.length - 1);
+                currentX = MARGIN + (CONTENT_WIDTH - rowW) / 2;
             }
 
             for (let i = 0; i < row.items.length; i++) {
                 let item = row.items[i];
-                let w = h * item.ratio;
+                let w = h * item.ratio; // Lebar dihitung proporsional dari tinggi, foto 100% UTUH!
 
-                // Shadow 3D
                 ctx.save();
                 ctx.shadowColor = 'rgba(0, 0, 0, 0.22)';
                 ctx.shadowBlur = 15;
@@ -341,7 +338,6 @@
                 ctx.fill();
                 ctx.restore();
 
-                // Gambar Foto (Utuh Tanpa Crop)
                 ctx.save();
                 ctx.beginPath();
                 ctx.roundRect(currentX, currentY, w, h, borderRadius);
@@ -349,12 +345,13 @@
                 ctx.drawImage(item.img, currentX, currentY, w, h);
                 ctx.restore();
 
+                // Tambahkan lebar foto dan padding, matematika presisi akan memastikan foto terakhir persis menyentuh garis margin kanan
                 currentX += w + paddingGap;
             }
             currentY += h + paddingGap;
         }
 
-        // Area Kotak Deskripsi
+        // Teks Bagian Bawah
         ctx.fillStyle = '#f8fafc';
         ctx.fillRect(MARGIN, MARGIN + photoAreaHeight, CONTENT_WIDTH, textAreaHeight);
         
@@ -396,6 +393,7 @@
         }
         ctx.fillText(line, paddingX, textY);
 
+        // Kompresi optimal
         return new Promise(resolve => {
             canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.78);
         });
@@ -544,7 +542,7 @@
                 }
             }
 
-            logStatus("Menyusun Laporan A3 Rata Kiri-Kanan (Flickr Style)...", true);
+            logStatus("Menyusun Laporan A3 (Rata Penuh Matematis)...", true);
             let reportBlob = await createReportImage(files, desc, targetDate, timeString);
 
             logStatus("Mengatur Folder Google Drive...", true);
@@ -561,7 +559,7 @@
             await updateOrCreateTxt(idHari, targetDate, timeString, desc);
 
             logStatus("✅ Laporan Berhasil Diunggah!", false);
-            alert('Laporan A3 profesional (rata penuh) & rekapan teks sukses disimpan di Drive!');
+            alert('Laporan A3 presisi rata penuh & rekapan teks sukses disimpan di Drive!');
             
             document.getElementById('photos').value = '';
             document.getElementById('description').value = '';
