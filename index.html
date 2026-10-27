@@ -204,7 +204,18 @@
         });
     }
 
-    // ALGORITMA MATRIKS KOLASE DINAMIS (ESTETIS, TANPA CROP, & RINGAN)
+    // Fungsi pemisah array rata
+    function partition(n, k) {
+        let base = Math.floor(n / k);
+        let rem = n % k;
+        let result = [];
+        for(let i=0; i<k; i++) {
+            result.push(base + (i < rem ? 1 : 0));
+        }
+        return result;
+    }
+
+    // ALGORITMA JUSTIFIED MASONRY LAYOUT (RATA KIRI-KANAN SEMPURNA)
     async function createReportImage(files, description, dateData, timeString) {
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -217,13 +228,13 @@
 
         const CONTENT_WIDTH = A3_WIDTH - (MARGIN * 2);
         const CONTENT_HEIGHT = A3_HEIGHT - (MARGIN * 2);
-        const photoAreaHeight = Math.floor(CONTENT_HEIGHT * 0.75);
+        const photoAreaHeight = Math.floor(CONTENT_HEIGHT * 0.75); // 75% max area foto
         const textAreaHeight = CONTENT_HEIGHT - photoAreaHeight;
 
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, A3_WIDTH, A3_HEIGHT);
 
-        // Header Teks Abu-abu (Pojok Kanan Atas)
+        // Header Teks Abu-abu
         ctx.fillStyle = '#94a3b8';
         ctx.font = 'italic 24px "Poppins", "Segoe UI", sans-serif';
         ctx.textAlign = 'right';
@@ -245,62 +256,83 @@
         }
 
         let totalImages = images.length;
-        let cols = 3;
-        if (totalImages === 1) cols = 1;
-        else if (totalImages === 2 || totalImages === 4) cols = 2;
-        else if (totalImages === 3 || totalImages === 5 || totalImages === 6) cols = 3;
-        else if (totalImages >= 7 && totalImages <= 8) cols = 3;
-        else if (totalImages >= 9) cols = 4;
-
-        let rows = Math.ceil(totalImages / cols);
         let paddingGap = 16;
         let borderRadius = 20;
 
-        let rowLayouts = [];
-        let remaining = totalImages;
-        for (let r = 0; r < rows; r++) {
-            let itemsInThisRow = Math.min(cols, remaining);
-            if (r === rows - 1 && itemsInThisRow === 1 && rowLayouts.length > 0 && rowLayouts[rowLayouts.length - 1] > 2) {
-                rowLayouts[rowLayouts.length - 1]--;
-                itemsInThisRow = 2;
+        let bestLayout = [];
+        let bestTotalH = 0;
+        let rowHeightsOutput = [];
+
+        // Mencari iterasi baris terbaik agar gambar sebesar mungkin tetapi rata kiri-kanan
+        // Dimulai dari jumlah baris terbanyak turun ke 1, agar menemukan kombinasi pertama yang muat di area foto
+        for (let numRows = totalImages; numRows >= 1; numRows--) {
+            let rowCounts = partition(totalImages, numRows);
+            
+            let tempRows = [];
+            let imgIdx = 0;
+            for(let i = 0; i < numRows; i++) {
+                tempRows.push(images.slice(imgIdx, imgIdx + rowCounts[i]));
+                imgIdx += rowCounts[i];
             }
-            rowLayouts.push(itemsInThisRow);
-            remaining -= itemsInThisRow;
+            
+            let totalH = 0;
+            let tempRowHeights = [];
+            
+            for (let r = 0; r < tempRows.length; r++) {
+                let rowImgs = tempRows[r];
+                // Hitung total rasio baris (sum of aspect ratios)
+                let sumRatio = rowImgs.reduce((sum, img) => sum + (img.width / img.height), 0);
+                
+                // Lebar tersedia = Lebar konten murni dikurangi total lebar celah padding
+                let w = CONTENT_WIDTH - (paddingGap * (rowImgs.length - 1));
+                
+                // Tinggi baris ini disesuaikan sehingga lebar gabungan seluruh foto di baris = w
+                let h = w / sumRatio;
+                tempRowHeights.push(h);
+                totalH += h;
+            }
+            totalH += paddingGap * (tempRows.length - 1);
+            
+            // Pilih layout pertama yang total tingginya aman (tidak melewati area teks deskripsi)
+            if (totalH <= photoAreaHeight) {
+                bestLayout = tempRows;
+                bestTotalH = totalH;
+                rowHeightsOutput = tempRowHeights;
+                break;
+            }
         }
 
-        let actualRowsCount = rowLayouts.length;
-        let rowHeight = photoAreaHeight / actualRowsCount;
-        let currentY = MARGIN;
+        // Fallback: Jika pengguna mengunggah hanya 1 foto panorama ekstrim tegak
+        if (bestLayout.length === 0) {
+            bestLayout = [images];
+            let rowImgs = bestLayout[0];
+            let sumRatio = rowImgs.reduce((sum, img) => sum + (img.width / img.height), 0);
+            let w = CONTENT_WIDTH - (paddingGap * (rowImgs.length - 1));
+            let h = w / sumRatio;
+            
+            if (h > photoAreaHeight) h = photoAreaHeight; 
+            rowHeightsOutput = [h];
+            bestTotalH = h;
+        }
 
-        let imgIndex = 0;
-        for (let r = 0; r < actualRowsCount; r++) {
-            let itemsInThisRow = rowLayouts[r];
-            let rowImages = [];
-            for (let i = 0; i < itemsInThisRow; i++) {
-                rowImages.push(images[imgIndex++]);
-            }
+        // Memposisikan seluruh blok foto agar berada tepat di tengah vertikal di dalam kotak foto
+        let currentY = MARGIN + (photoAreaHeight - bestTotalH) / 2;
 
-            let availableWidth = CONTENT_WIDTH - (paddingGap * (rowImages.length - 1));
-            let totalAspectRatios = rowImages.reduce((sum, img) => sum + (img.width / img.height), 0);
-            let rowActualHeight = availableWidth / totalAspectRatios;
-
-            if (rowActualHeight > rowHeight) {
-                rowActualHeight = rowHeight;
-            }
-
+        // Proses Menggambar
+        for (let r = 0; r < bestLayout.length; r++) {
+            let rowImgs = bestLayout[r];
+            let h = rowHeightsOutput[r];
             let currentX = MARGIN;
-            let rowTotalW = rowImages.reduce((sum, img) => sum + (rowActualHeight * (img.width / img.height)), 0) + (paddingGap * (rowImages.length - 1));
-            if (rowImages.length < cols) {
-                currentX = MARGIN + (CONTENT_WIDTH - rowTotalW) / 2;
+            
+            // Penyesuaian offset tengah khusus untuk fallback (1 baris foto ekstrim tegak)
+            let actualRowWidth = rowImgs.reduce((sum, img) => sum + (h * (img.width / img.height)), 0) + (paddingGap * (rowImgs.length - 1));
+            if (actualRowWidth < CONTENT_WIDTH - 1) {
+                currentX = MARGIN + (CONTENT_WIDTH - actualRowWidth) / 2;
             }
 
-            for (let i = 0; i < rowImages.length; i++) {
-                let img = rowImages[i];
-                let imgW = rowActualHeight * (img.width / img.height);
-                let imgH = rowActualHeight;
-
-                let drawX = currentX;
-                let drawY = currentY + (rowHeight - imgH) / 2;
+            for (let i = 0; i < rowImgs.length; i++) {
+                let img = rowImgs[i];
+                let w = h * (img.width / img.height); // Skalakan proporsional!
 
                 // 1. Shadow 3D
                 ctx.save();
@@ -310,24 +342,24 @@
                 ctx.shadowOffsetY = 6;
                 ctx.fillStyle = 'white';
                 ctx.beginPath();
-                ctx.roundRect(drawX, drawY, imgW, imgH, borderRadius);
+                ctx.roundRect(currentX, currentY, w, h, borderRadius);
                 ctx.fill();
                 ctx.restore();
 
-                // 2. Gambar Foto Utuh Tanpa Crop
+                // 2. Gambar Foto Rata Kiri-Kanan Utuh
                 ctx.save();
                 ctx.beginPath();
-                ctx.roundRect(drawX, drawY, imgW, imgH, borderRadius);
+                ctx.roundRect(currentX, currentY, w, h, borderRadius);
                 ctx.clip();
-                ctx.drawImage(img, drawX, drawY, imgW, imgH);
+                ctx.drawImage(img, currentX, currentY, w, h);
                 ctx.restore();
 
-                currentX += imgW + paddingGap;
+                currentX += w + paddingGap;
             }
-            currentY += rowHeight;
+            currentY += h + paddingGap;
         }
 
-        // Area Kotak Deskripsi di Bagian Bawah
+        // --- TEKS BAWAH ---
         ctx.fillStyle = '#f8fafc';
         ctx.fillRect(MARGIN, MARGIN + photoAreaHeight, CONTENT_WIDTH, textAreaHeight);
         
@@ -369,7 +401,6 @@
         }
         ctx.fillText(line, paddingX, textY);
 
-        // Kompresi kualitas diturunkan ke 0.78 agar ukuran file lebih ringan & cepat diunggah
         return new Promise(resolve => {
             canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.78);
         });
@@ -518,7 +549,7 @@
                 }
             }
 
-            logStatus("Menyusun Laporan A3 Dioptimalkan...", true);
+            logStatus("Menyusun Laporan A3 Rata Kiri-Kanan...", true);
             let reportBlob = await createReportImage(files, desc, targetDate, timeString);
 
             logStatus("Mengatur Folder Google Drive...", true);
@@ -535,7 +566,7 @@
             await updateOrCreateTxt(idHari, targetDate, timeString, desc);
 
             logStatus("✅ Laporan Berhasil Diunggah!", false);
-            alert('Laporan A3 optimal & rekapan teks sukses disimpan di Drive!');
+            alert('Laporan A3 rata penuh & rekapan teks sukses disimpan di Drive!');
             
             document.getElementById('photos').value = '';
             document.getElementById('description').value = '';
