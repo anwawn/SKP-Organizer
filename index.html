@@ -107,14 +107,19 @@
             <label>Unggah Foto (Bisa lebih dari 1)</label>
             <input type="file" id="photos" multiple accept="image/*">
         </div>
+        <div class="form-group">
+            <label>Tanggal Alternatif (Jika foto tanpa EXIF)</label>
+            <input type="date" id="fallbackDate">
+        </div>
+        <!-- Kolom Waktu Alternatif dipisah menjadi dua -->
         <div class="form-group flex-group">
             <div>
-                <label>Tanggal Alternatif</label>
-                <input type="date" id="fallbackDate">
+                <label>Waktu Mulai (Alt)</label>
+                <input type="time" id="fallbackTimeStart">
             </div>
             <div>
-                <label>Waktu Alternatif</label>
-                <input type="time" id="fallbackTime">
+                <label>Waktu Akhir (Alt)</label>
+                <input type="time" id="fallbackTimeEnd">
             </div>
         </div>
         <div class="form-group">
@@ -204,7 +209,7 @@
         });
     }
 
-    // ALGORITMA BINARY SEARCH JUSTIFIED GRID (GARANSI RATA KIRI-KANAN)
+    // ALGORITMA BINARY SEARCH JUSTIFIED GRID (GARANSI RATA KIRI-KANAN) - TIDAK DIUBAH SAMA SEKALI
     async function createReportImage(files, description, dateData, timeString) {
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -246,15 +251,13 @@
         let paddingGap = 16;
         let borderRadius = 20;
         
-        // PENCARIAN BINER UNTUK MENCARI TINGGI BARIS YANG SEMPURNA
-        let low = 50;   // Tinggi minimal baris yang diizinkan
-        let high = 1500; // Tinggi maksimal baris
+        let low = 50;   
+        let high = 1500; 
         let finalRows = [];
         let finalTotalHeight = 0;
 
-        // Lakukan 50 iterasi untuk presisi tinggi tingkat sub-piksel
         for (let iter = 0; iter < 50; iter++) {
-            let mid = (low + high) / 2; // Target tinggi rata-rata baris saat ini
+            let mid = (low + high) / 2; 
             let tempRows = [];
             let currentRow = [];
             let currentRatio = 0;
@@ -264,10 +267,8 @@
                 currentRow.push({ img: images[i], ratio: ratio });
                 currentRatio += ratio;
 
-                // Hitung tinggi yang dibutuhkan agar baris ini memenuhi 100% lebar A3
                 let h_justified = (CONTENT_WIDTH - paddingGap * (currentRow.length - 1)) / currentRatio;
 
-                // Kunci baris jika tingginya sudah menyentuh target 'mid' atau ini foto terakhir
                 if (h_justified <= mid || i === images.length - 1) {
                     tempRows.push({ items: currentRow, ratio: currentRatio, h: h_justified });
                     currentRow = [];
@@ -275,49 +276,40 @@
                 }
             }
 
-            // Aturan Khusus Baris Terakhir (Jika jumlah foto ganjil/sedikit)
             if (tempRows.length > 1) {
                 let prevH = tempRows[tempRows.length - 2].h;
-                // Jika baris terakhir melar menjadi sangat raksasa, potong tingginya menyesuaikan baris sebelumnya
                 if (tempRows[tempRows.length - 1].h > prevH * 1.3) {
                     tempRows[tempRows.length - 1].h = prevH;
-                    tempRows[tempRows.length - 1].isCentered = true; // Ratakan tengah saja
+                    tempRows[tempRows.length - 1].isCentered = true; 
                 }
             } else if (tempRows.length === 1 && tempRows[0].h > photoAreaHeight * 0.7) {
                 tempRows[0].h = photoAreaHeight * 0.7;
                 tempRows[0].isCentered = true;
             }
 
-            // Hitung total tinggi semua susunan baris ini
             let totalH = tempRows.reduce((sum, r) => sum + r.h, 0) + paddingGap * (tempRows.length - 1);
 
-            // Jika total tinggi muat di area kertas, simpan sebagai kandidat terbaik, lalu coba perbesar lagi (low = mid)
             if (totalH <= photoAreaHeight) {
                 finalRows = tempRows;
                 finalTotalHeight = totalH;
                 low = mid; 
             } else {
-                // Jika total tinggi melebih kertas, kita butuh baris yang lebih pendek (foto lebih banyak per baris)
                 high = mid;
             }
         }
 
-        // Jika karena suatu hal kalkulasi awal tidak memberikan hasil, paksakan baris dari iterasi terakhir
         if (finalRows.length === 0) finalRows = [{ items: images.map(img => ({img, ratio: img.width/img.height})), h: photoAreaHeight/3, ratio: images.reduce((sum, img)=>sum+img.width/img.height,0), isCentered: true }];
 
-        // Posisikan susunan persis di tengah vertikal area foto
         let currentY = MARGIN;
         if (finalTotalHeight < photoAreaHeight) {
             currentY = MARGIN + (photoAreaHeight - finalTotalHeight) / 2;
         }
 
-        // PROSES MENGGAMBAR FOTO (Rata Penuh Kiri-Kanan)
         for (let r = 0; r < finalRows.length; r++) {
             let row = finalRows[r];
             let h = row.h;
             let currentX = MARGIN;
             
-            // Baris terakhir biasanya rata tengah karena fotonya sedikit
             if (row.isCentered) {
                 let rowW = row.items.reduce((sum, item) => sum + (h * item.ratio), 0) + paddingGap * (row.items.length - 1);
                 currentX = MARGIN + (CONTENT_WIDTH - rowW) / 2;
@@ -325,7 +317,7 @@
 
             for (let i = 0; i < row.items.length; i++) {
                 let item = row.items[i];
-                let w = h * item.ratio; // Lebar dihitung proporsional dari tinggi, foto 100% UTUH!
+                let w = h * item.ratio; 
 
                 ctx.save();
                 ctx.shadowColor = 'rgba(0, 0, 0, 0.22)';
@@ -345,13 +337,11 @@
                 ctx.drawImage(item.img, currentX, currentY, w, h);
                 ctx.restore();
 
-                // Tambahkan lebar foto dan padding, matematika presisi akan memastikan foto terakhir persis menyentuh garis margin kanan
                 currentX += w + paddingGap;
             }
             currentY += h + paddingGap;
         }
 
-        // Teks Bagian Bawah
         ctx.fillStyle = '#f8fafc';
         ctx.fillRect(MARGIN, MARGIN + photoAreaHeight, CONTENT_WIDTH, textAreaHeight);
         
@@ -393,7 +383,6 @@
         }
         ctx.fillText(line, paddingX, textY);
 
-        // Kompresi optimal
         return new Promise(resolve => {
             canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.78);
         });
@@ -488,7 +477,11 @@
         const files = document.getElementById('photos').files;
         const desc = document.getElementById('description').value;
         const fallbackDate = document.getElementById('fallbackDate').value;
-        const fallbackTime = document.getElementById('fallbackTime').value;
+        
+        // Membaca dua input waktu yang baru
+        const fallbackTimeStart = document.getElementById('fallbackTimeStart').value;
+        const fallbackTimeEnd = document.getElementById('fallbackTimeEnd').value;
+        
         const btn = document.getElementById('btnUpload');
 
         if (files.length === 0) return alert('Pilih minimal 1 foto laporan!');
@@ -499,10 +492,37 @@
         try {
             logStatus("Memindai data waktu pada foto...", true);
             
-            let firstExif = await getPhotoExifData(files[0]);
+            let allExifs = [];
+            for (let i = 0; i < files.length; i++) {
+                let file = files[i];
+                let e = await getPhotoExifData(file);
+                allExifs.push({ file: file, exif: e, originalIndex: i });
+            }
+
             let targetDate;
-            if (firstExif) {
-                targetDate = { year: firstExif.year, month: firstExif.month, day: firstExif.day };
+            let timeString = "";
+            let hasAnyExif = allExifs.some(item => item.exif !== null);
+            
+            if (hasAnyExif) {
+                let dateCounts = {};
+                for (let item of allExifs) {
+                    if (item.exif) {
+                        let dStr = `${item.exif.year}-${item.exif.month}-${item.exif.day}`;
+                        dateCounts[dStr] = (dateCounts[dStr] || 0) + 1;
+                    }
+                }
+                
+                let maxCount = 0;
+                let majorityDateStr = "";
+                for (let dStr in dateCounts) {
+                    if (dateCounts[dStr] > maxCount) {
+                        maxCount = dateCounts[dStr];
+                        majorityDateStr = dStr;
+                    }
+                }
+                
+                let parts = majorityDateStr.split('-');
+                targetDate = { year: parts[0], month: parts[1], day: parts[2] };
             } else if (fallbackDate) {
                 let d = new Date(fallbackDate);
                 targetDate = {
@@ -511,21 +531,38 @@
                     day: ('0' + d.getDate()).slice(-2)
                 };
             } else {
-                throw new Error("Foto pertama tidak memiliki data waktu. Mohon isi Tanggal Alternatif.");
+                throw new Error("Tidak ada data waktu di semua foto. Mohon isi Tanggal Alternatif.");
             }
 
-            let allExifs = [];
-            for(let file of files) {
-                let e = await getPhotoExifData(file);
-                if(e) allExifs.push(e);
-            }
-            let validTimes = allExifs.filter(e => e.year === targetDate.year && e.month === targetDate.month && e.day === targetDate.day);
+            let validTimes = [];
+            let filesToRender = []; 
 
-            let timeString = "";
+            if (hasAnyExif) {
+                let validItems = allExifs.filter(item => 
+                    item.exif && 
+                    item.exif.year === targetDate.year && 
+                    item.exif.month === targetDate.month && 
+                    item.exif.day === targetDate.day
+                );
+                
+                validItems.sort((a, b) => a.exif.totalMins - b.exif.totalMins);
+                validTimes = validItems.map(item => item.exif);
+                
+                let nonMajorityOrNoExif = allExifs.filter(item => 
+                    !item.exif || 
+                    item.exif.year !== targetDate.year || 
+                    item.exif.month !== targetDate.month || 
+                    item.exif.day !== targetDate.day
+                );
+                
+                filesToRender = validItems.map(item => item.file).concat(nonMajorityOrNoExif.map(item => item.file));
+            } else {
+                filesToRender = Array.from(files);
+            }
+
             if (validTimes.length > 0) {
-                validTimes.sort((a, b) => a.totalMins - b.totalMins);
-                let first = validTimes[0];
-                let last = validTimes[validTimes.length - 1];
+                let first = validTimes[0]; 
+                let last = validTimes[validTimes.length - 1]; 
                 let diff = last.totalMins - first.totalMins;
 
                 if (diff < 60) {
@@ -534,16 +571,22 @@
                     timeString = `${first.hour}.${first.minute} - ${last.hour}.${last.minute} WITA`;
                 }
             } else {
-                if (fallbackTime) {
-                    let tParts = fallbackTime.split(':');
-                    timeString = `${tParts[0]}.${tParts[1]} WITA - selesai`;
+                // LOGIKA BARU UNTUK DUA KOLOM WAKTU ALTERNATIF
+                if (fallbackTimeStart && fallbackTimeEnd) {
+                    let sParts = fallbackTimeStart.split(':');
+                    let eParts = fallbackTimeEnd.split(':');
+                    timeString = `${sParts[0]}.${sParts[1]} - ${eParts[0]}.${eParts[1]} WITA`;
+                } else if (fallbackTimeStart) {
+                    let sParts = fallbackTimeStart.split(':');
+                    timeString = `${sParts[0]}.${sParts[1]} WITA - selesai`;
                 } else {
                     timeString = "(Waktu manual / tidak tercatat)";
                 }
             }
 
-            logStatus("Menyusun Laporan A3 (Rata Penuh Matematis)...", true);
-            let reportBlob = await createReportImage(files, desc, targetDate, timeString);
+            logStatus("Menyusun Laporan A3 (Kronologis & Rata Penuh)...", true);
+            
+            let reportBlob = await createReportImage(filesToRender, desc, targetDate, timeString);
 
             logStatus("Mengatur Folder Google Drive...", true);
             let idUtama = await getOrCreateFolder("laporan kerja pegawai");
@@ -559,7 +602,7 @@
             await updateOrCreateTxt(idHari, targetDate, timeString, desc);
 
             logStatus("✅ Laporan Berhasil Diunggah!", false);
-            alert('Laporan A3 presisi rata penuh & rekapan teks sukses disimpan di Drive!');
+            alert('Laporan A3 berhasil disortir kronologis & sukses disimpan di Drive!');
             
             document.getElementById('photos').value = '';
             document.getElementById('description').value = '';
