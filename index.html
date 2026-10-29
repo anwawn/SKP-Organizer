@@ -43,20 +43,14 @@
         h1 { font-size: 1.4rem; text-align: center; color: var(--primary); margin-bottom: 25px; font-weight: 600; }
         
         .form-group { margin-bottom: 20px; }
-        .flex-group { display: flex; gap: 15px; width: 100%; }
-        .flex-group > div { flex: 1; min-width: 0; }
+        .flex-group { display: flex; gap: 15px; }
+        .flex-group > div { flex: 1; }
         
         label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.95rem; color: var(--text-main); }
         
         input[type="date"], input[type="time"], textarea { 
-            width: 100%; 
-            max-width: 100%;
-            box-sizing: border-box;
-            padding: 12px 15px; 
-            border: 1.5px solid #d1d5db; 
-            border-radius: 10px; 
-            font-size: 0.95rem; 
-            transition: all 0.3s ease; 
+            width: 100%; padding: 12px 15px; border: 1.5px solid #d1d5db; 
+            border-radius: 10px; font-size: 0.95rem; transition: all 0.3s ease; 
             background: #f9fafb;
         }
         
@@ -68,7 +62,6 @@
         input[type="file"] {
             width: 100%; padding: 15px; background: #f8fafc;
             border: 2px dashed #cbd5e1; border-radius: 12px; cursor: pointer; transition: 0.3s;
-            box-sizing: border-box;
         }
         input[type="file"]:hover { border-color: var(--primary); }
         input[type="file"]::file-selector-button {
@@ -97,17 +90,6 @@
         #status { margin-top: 20px; font-size: 0.9rem; text-align: center; color: var(--text-muted); font-weight: 500; }
         .loading:after { content: '...'; animation: dots 1.5s steps(5, end) infinite; }
         @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
-
-        /* Media Query: Memperbaiki Offside di Peramban Mobile */
-        @media (max-width: 480px) {
-            .container {
-                padding: 25px 15px; /* Mengurangi padding agar form lebih lega ke samping */
-            }
-            .flex-group {
-                flex-direction: column; /* Mengubah kolom berdampingan menjadi atas-bawah */
-                gap: 15px;
-            }
-        }
     </style>
 </head>
 <body>
@@ -573,9 +555,11 @@
                 filesToRender = Array.from(files);
             }
 
+            // LOGIKA HYBRID TIME / CROSSOVER MENDETEKSI MANUAL vs OTOMATIS
             let startTimeStr = "";
             let endTimeStr = "";
             
+            // 1. Tentukan Waktu Awal
             if (fallbackTimeStart) {
                 let sParts = fallbackTimeStart.split(':');
                 startTimeStr = `${sParts[0]}.${sParts[1]}`;
@@ -584,16 +568,18 @@
                 startTimeStr = `${first.hour}.${first.minute}`;
             }
             
+            // 2. Tentukan Waktu Akhir
             if (fallbackTimeEnd) {
                 let eParts = fallbackTimeEnd.split(':');
                 endTimeStr = `${eParts[0]}.${eParts[1]}`;
             } else if (validTimes.length > 0) {
                 let last = validTimes[validTimes.length - 1];
+                // Cek khusus jika murni dari EXIF dan rentangnya di bawah 1 jam (opsional sesuai behavior sistem lawas)
                 if (!fallbackTimeStart && !fallbackTimeEnd) {
                     let first = validTimes[0];
                     let diff = last.totalMins - first.totalMins;
                     if (diff < 60) {
-                        endTimeStr = ""; 
+                        endTimeStr = ""; // Dikosongkan agar dilempar ke aturan "WITA - selesai"
                     } else {
                         endTimeStr = `${last.hour}.${last.minute}`;
                     }
@@ -602,6 +588,7 @@
                 }
             }
 
+            // 3. Gabungkan String Output Final
             if (startTimeStr && endTimeStr) {
                 timeString = `${startTimeStr} - ${endTimeStr} WITA`;
             } else if (startTimeStr) {
@@ -612,7 +599,7 @@
                 timeString = "(Waktu manual / tidak tercatat)";
             }
 
-            logStatus("Menyusun Laporan A3...", true);
+            logStatus("Menyusun Laporan A3 (Hybrid Crossover)...", true);
             
             let reportBlob = await createReportImage(filesToRender, desc, targetDate, timeString);
 
