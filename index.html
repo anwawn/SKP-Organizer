@@ -98,23 +98,21 @@
         .loading:after { content: '...'; animation: dots 1.5s steps(5, end) infinite; }
         @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
 
-        /* Media Query Mobile: Tetap Sejajar dengan Penyesuaian Ruang */
         @media (max-width: 480px) {
             .container { padding: 25px 15px; }
             .flex-group { 
-                flex-direction: row; /* Memaksa tetap sejajar menyamping */
-                gap: 8px; /* Mengurangi jarak tengah agar tidak sesak */
+                flex-direction: row;
+                gap: 8px;
             }
             .flex-group label {
-                font-size: 0.8rem; /* Mengecilkan font label sedikit */
+                font-size: 0.8rem;
             }
             .flex-group input[type="time"] {
-                padding: 10px 8px; /* Mengurangi padding dalam kotak input */
-                font-size: 0.85rem; /* Mengecilkan teks jam agar muat */
+                padding: 10px 8px;
+                font-size: 0.85rem;
             }
         }
 
-        /* Styles untuk Modal Konfirmasi */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.6); z-index: 999; align-items: center; justify-content: center;
@@ -155,10 +153,9 @@
             <input type="file" id="photos" multiple accept="image/*">
         </div>
         <div class="form-group">
-            <label>Tanggal Alternatif (Jika foto tanpa EXIF)</label>
+            <label>Tanggal (Isi manual untuk menimpa data foto)</label>
             <input type="date" id="fallbackDate">
         </div>
-        <!-- Kolom Waktu dipertahankan sejajar menyamping -->
         <div class="form-group flex-group">
             <div>
                 <label>Waktu Mulai (Alt)</label>
@@ -256,7 +253,6 @@
         }
     }
 
-    // FUNGSI JEDA POP-UP KONFIRMASI (PROMISE)
     function askUserConfirmation(dateString, timeString) {
         return new Promise((resolve) => {
             const overlay = document.getElementById('modalOverlay');
@@ -585,6 +581,7 @@
             }
 
             let targetDate;
+            let exifMajorityDate = null;
             let timeString = "";
             let hasAnyExif = allExifs.some(item => item.exif !== null);
             
@@ -607,27 +604,31 @@
                 }
                 
                 let parts = majorityDateStr.split('-');
-                targetDate = { year: parts[0], month: parts[1], day: parts[2] };
-            } else if (fallbackDate) {
+                exifMajorityDate = { year: parts[0], month: parts[1], day: parts[2] };
+            }
+
+            if (fallbackDate) {
                 let d = new Date(fallbackDate);
                 targetDate = {
                     year: d.getFullYear().toString(),
                     month: ('0' + (d.getMonth() + 1)).slice(-2),
                     day: ('0' + d.getDate()).slice(-2)
                 };
+            } else if (exifMajorityDate) {
+                targetDate = exifMajorityDate;
             } else {
-                throw new Error("Tidak ada data waktu di semua foto. Mohon isi Tanggal Alternatif.");
+                throw new Error("Tidak ada data waktu di foto. Mohon isi kolom Tanggal manual.");
             }
 
             let validTimes = [];
             let filesToRender = []; 
 
-            if (hasAnyExif) {
+            if (hasAnyExif && exifMajorityDate) {
                 let validItems = allExifs.filter(item => 
                     item.exif && 
-                    item.exif.year === targetDate.year && 
-                    item.exif.month === targetDate.month && 
-                    item.exif.day === targetDate.day
+                    item.exif.year === exifMajorityDate.year && 
+                    item.exif.month === exifMajorityDate.month && 
+                    item.exif.day === exifMajorityDate.day
                 );
                 
                 validItems.sort((a, b) => a.exif.totalMins - b.exif.totalMins);
@@ -635,9 +636,9 @@
                 
                 let nonMajorityOrNoExif = allExifs.filter(item => 
                     !item.exif || 
-                    item.exif.year !== targetDate.year || 
-                    item.exif.month !== targetDate.month || 
-                    item.exif.day !== targetDate.day
+                    item.exif.year !== exifMajorityDate.year || 
+                    item.exif.month !== exifMajorityDate.month || 
+                    item.exif.day !== exifMajorityDate.day
                 );
                 
                 filesToRender = validItems.map(item => item.file).concat(nonMajorityOrNoExif.map(item => item.file));
