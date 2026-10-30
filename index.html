@@ -134,7 +134,6 @@
         .btn-cancel:hover { background: #e2e8f0; }
         .btn-proceed { flex: 1; padding: 12px; background: var(--success); color: white; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3); }
         .btn-proceed:hover { background: var(--success-hover); transform: translateY(-2px); }
-
     </style>
 </head>
 <body>
@@ -499,7 +498,6 @@
         return createRes.id;
     }
 
-    // LOGIKA BARU: Tautan dipaku di paling bawah dokumen
     async function updateOrCreateTxt(folderIdHari, folderIdBulan, dateData, timeString, desc) {
         let txtFilename = `Deskripsi_${dateData.year}${dateData.month}${dateData.day}.txt`;
         let q = `name='${txtFilename}' and mimeType='text/plain' and '${folderIdHari}' in parents and trashed=false`;
@@ -509,7 +507,9 @@
         let linkHari = `https://drive.google.com/drive/folders/${folderIdHari}`;
         
         let newEntry = `=================================\nWaktu: ${timeString}\nDeskripsi:\n${desc}`;
-        let linkText = `\n\n---------------------------------\n[ TAUTAN FOLDER DRIVE ]\n📁 Folder Bulan: ${linkBulan}\n📁 Folder Hari: ${linkHari}`;
+        
+        // Memisahkan URL murni di baris baru agar 100% terdeteksi sebagai hyperlink otomatis
+        let linkText = `\n\n---------------------------------\n[ TAUTAN FOLDER DRIVE ]\n📁 Folder Bulan:\n${linkBulan}\n\n📁 Folder Hari:\n${linkHari}`;
 
         if (searchRes.files && searchRes.files.length > 0) {
             let fileId = searchRes.files[0].id;
@@ -518,9 +518,8 @@
             });
             let oldContent = await contentRes.text();
             
-            // Logika Pintar: Membersihkan tautan lama (jika ada) lalu memasang tautan baru di baris paling akhir
             let marker = "---------------------------------\n[ TAUTAN FOLDER DRIVE ]";
-            let fallbackMarker = "[ Tautan Akses Folder Drive ]"; // Jaga-jaga jika ada sisa format lama
+            let fallbackMarker = "[ Tautan Akses Folder Drive ]";
             let cleanContent = oldContent;
             
             if (oldContent.includes(marker)) {
