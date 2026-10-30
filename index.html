@@ -499,12 +499,16 @@
         return createRes.id;
     }
 
-    async function updateOrCreateTxt(folderId, dateData, timeString, desc) {
+    // MODIFIKASI: Menerima ID Folder Bulan dan Hari, lalu menyematkan linknya di text
+    async function updateOrCreateTxt(folderIdHari, folderIdBulan, dateData, timeString, desc) {
         let txtFilename = `Deskripsi_${dateData.year}${dateData.month}${dateData.day}.txt`;
-        let q = `name='${txtFilename}' and mimeType='text/plain' and '${folderId}' in parents and trashed=false`;
+        let q = `name='${txtFilename}' and mimeType='text/plain' and '${folderIdHari}' in parents and trashed=false`;
         let searchRes = await fetchDrive(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`);
         
-        let newEntry = `=================================\nWaktu: ${timeString}\nDeskripsi:\n${desc}\n`;
+        let linkBulan = `https://drive.google.com/drive/folders/${folderIdBulan}`;
+        let linkHari = `https://drive.google.com/drive/folders/${folderIdHari}`;
+        
+        let newEntry = `=================================\nWaktu: ${timeString}\nDeskripsi:\n${desc}\n\n[ Tautan Akses Folder Drive ]\n📁 Folder Bulan: ${linkBulan}\n📁 Folder Hari: ${linkHari}\n`;
 
         if (searchRes.files && searchRes.files.length > 0) {
             let fileId = searchRes.files[0].id;
@@ -521,7 +525,7 @@
             });
         } else {
             let initialContent = `REKAPITULASI DESKRIPSI KEGIATAN\nTanggal: ${dateData.day}-${dateData.month}-${dateData.year}\n\n` + newEntry;
-            let metadata = { name: txtFilename, parents: [folderId], mimeType: 'text/plain' };
+            let metadata = { name: txtFilename, parents: [folderIdHari], mimeType: 'text/plain' };
             let formData = new FormData();
             formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
             formData.append('file', new Blob([initialContent], { type: 'text/plain' }));
@@ -716,7 +720,8 @@
             let imgFilename = `Laporan_${targetDate.year}${targetDate.month}${targetDate.day}_${new Date().getTime()}.jpg`;
             await uploadToDrive(reportBlob, imgFilename, idHari);
 
-            await updateOrCreateTxt(idHari, targetDate, timeString, desc);
+            // MODIFIKASI: Memasukkan idBulan agar linknya bisa digenerate di dalam notepad
+            await updateOrCreateTxt(idHari, idBulan, targetDate, timeString, desc);
 
             logStatus("✅ Laporan Berhasil Diunggah!", false);
             alert('Laporan A3 berhasil disortir & hybrid waktu sukses disimpan di Drive!');
