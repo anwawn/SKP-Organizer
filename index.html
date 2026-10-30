@@ -499,7 +499,7 @@
         return createRes.id;
     }
 
-    // MODIFIKASI: Menerima ID Folder Bulan dan Hari, lalu menyematkan linknya di text
+    // LOGIKA BARU: Tautan dipaku di paling bawah dokumen
     async function updateOrCreateTxt(folderIdHari, folderIdBulan, dateData, timeString, desc) {
         let txtFilename = `Deskripsi_${dateData.year}${dateData.month}${dateData.day}.txt`;
         let q = `name='${txtFilename}' and mimeType='text/plain' and '${folderIdHari}' in parents and trashed=false`;
@@ -508,7 +508,8 @@
         let linkBulan = `https://drive.google.com/drive/folders/${folderIdBulan}`;
         let linkHari = `https://drive.google.com/drive/folders/${folderIdHari}`;
         
-        let newEntry = `=================================\nWaktu: ${timeString}\nDeskripsi:\n${desc}\n\n[ Tautan Akses Folder Drive ]\n📁 Folder Bulan: ${linkBulan}\n📁 Folder Hari: ${linkHari}\n`;
+        let newEntry = `=================================\nWaktu: ${timeString}\nDeskripsi:\n${desc}`;
+        let linkText = `\n\n---------------------------------\n[ TAUTAN FOLDER DRIVE ]\n📁 Folder Bulan: ${linkBulan}\n📁 Folder Hari: ${linkHari}`;
 
         if (searchRes.files && searchRes.files.length > 0) {
             let fileId = searchRes.files[0].id;
@@ -516,7 +517,19 @@
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             });
             let oldContent = await contentRes.text();
-            let finalContent = oldContent + '\n' + newEntry;
+            
+            // Logika Pintar: Membersihkan tautan lama (jika ada) lalu memasang tautan baru di baris paling akhir
+            let marker = "---------------------------------\n[ TAUTAN FOLDER DRIVE ]";
+            let fallbackMarker = "[ Tautan Akses Folder Drive ]"; // Jaga-jaga jika ada sisa format lama
+            let cleanContent = oldContent;
+            
+            if (oldContent.includes(marker)) {
+                cleanContent = oldContent.substring(0, oldContent.indexOf(marker)).trimEnd();
+            } else if (oldContent.includes(fallbackMarker)) {
+                cleanContent = oldContent.substring(0, oldContent.indexOf(fallbackMarker)).trimEnd();
+            }
+            
+            let finalContent = cleanContent + '\n\n' + newEntry + linkText;
 
             await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
                 method: 'PATCH',
@@ -524,7 +537,7 @@
                 body: finalContent
             });
         } else {
-            let initialContent = `REKAPITULASI DESKRIPSI KEGIATAN\nTanggal: ${dateData.day}-${dateData.month}-${dateData.year}\n\n` + newEntry;
+            let initialContent = `REKAPITULASI DESKRIPSI KEGIATAN\nTanggal: ${dateData.day}-${dateData.month}-${dateData.year}\n\n` + newEntry + linkText;
             let metadata = { name: txtFilename, parents: [folderIdHari], mimeType: 'text/plain' };
             let formData = new FormData();
             formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
@@ -720,7 +733,6 @@
             let imgFilename = `Laporan_${targetDate.year}${targetDate.month}${targetDate.day}_${new Date().getTime()}.jpg`;
             await uploadToDrive(reportBlob, imgFilename, idHari);
 
-            // MODIFIKASI: Memasukkan idBulan agar linknya bisa digenerate di dalam notepad
             await updateOrCreateTxt(idHari, idBulan, targetDate, timeString, desc);
 
             logStatus("✅ Laporan Berhasil Diunggah!", false);
